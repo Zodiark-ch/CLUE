@@ -33,13 +33,13 @@ class UnlearnDataset(Dataset):
         else:
             self.forget_dataset = None
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         self.retain_datasets = {}
         for key, value in datasets.items():
             if key.startswith("retain"):
                 self.retain_datasets[key] = value
         
-        # 如果没有retain数据集，设置为None
+        # If no retain datasets, set to None
         if not self.retain_datasets:
             self.retain_datasets = {"retain": None}
 
@@ -49,7 +49,7 @@ class UnlearnDataset(Dataset):
         if self.forget_dataset:
             return len(self.forget_dataset)
         elif self.retain_datasets:
-            # 返回第一个非None的retain数据集的长度
+            # Return length of first non-None retain dataset
             for dataset in self.retain_datasets.values():
                 if dataset is not None:
                     return len(dataset)
@@ -70,7 +70,7 @@ class UnlearnDataset(Dataset):
                 retain_index_list = list(
                     set(range(len(self.forget_dataset))) - set(forget_index_list)
                 )
-                # 对于多个retain数据集的情况，将self_retain的数据分配给第一个retain数据集
+                # For multiple retain datasets, assign self_retain data to first retain dataset
                 first_retain_key = list(self.retain_datasets.keys())[0]
                 self.retain_datasets[first_retain_key] = self.forget_dataset.select(retain_index_list)
             self.forget_dataset = self.forget_dataset.select(forget_index_list)
@@ -79,7 +79,7 @@ class UnlearnDataset(Dataset):
         if self.forget_dataset:
             forget_data = self.forget_dataset[idx]
             if self.retain_datasets:
-                # 随机选择一个retain数据集
+                # Randomly select a retain dataset
                 available_retain_keys = [key for key, dataset in self.retain_datasets.items() if dataset is not None]
                 if available_retain_keys:
                     selected_retain_key = random.choice(available_retain_keys)
@@ -87,7 +87,7 @@ class UnlearnDataset(Dataset):
                     retain_idx = random.randint(0, len(selected_retain_dataset) - 1)
                     retain_data = selected_retain_dataset[retain_idx]
                     
-                    # 如果是单个retain数据集且键名是"retain"，保持向后兼容性
+                    # If single retain dataset with key "retain", maintain backward compatibility
                     if len(self.retain_datasets) == 1 and "retain" in self.retain_datasets:
                         return {"forget": forget_data, "retain": retain_data}
                     else:
@@ -97,11 +97,11 @@ class UnlearnDataset(Dataset):
             else:
                 return {"forget": forget_data, "retain": None}
         else:
-            # 如果没有forget数据集，从第一个可用的retain数据集中获取数据
+            # If no forget dataset, get data from first available retain dataset
             for key, dataset in self.retain_datasets.items():
                 if dataset is not None:
                     retain_data = dataset[idx]
-                    # 如果是单个retain数据集且键名是"retain"，保持向后兼容性
+                    # If single retain dataset with key "retain", maintain backward compatibility
                     if len(self.retain_datasets) == 1 and "retain" in self.retain_datasets:
                         return {"forget": None, "retain": retain_data}
                     else:
@@ -123,13 +123,13 @@ def unlearncollector(samples):
     else:
         res["forget"] = None
     
-    # 处理多个retain数据集的情况
+    # Handle multiple retain datasets
     retain_keys = []
     for key in samples[0].keys():
         if key.startswith("retain"):
             retain_keys.append(key)
     
-    # 如果没有找到retain键，尝试向后兼容的"retain"键
+    # If no retain keys found, try backward compatible "retain" key
     if not retain_keys and "retain" in samples[0]:
         retain_keys = ["retain"]
     

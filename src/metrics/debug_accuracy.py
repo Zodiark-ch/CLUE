@@ -6,26 +6,26 @@ from torch.utils.data import DataLoader
 
 def debug_dataset_format(retain_dataset, num_samples=5):
     """
-    调试数据集格式，显示前几个样本的结构
+    Debug dataset format, display structure of first few samples
     """
-    print("=== 数据集格式调试 ===")
-    print(f"数据集类型: {type(retain_dataset)}")
-    print(f"数据集长度: {len(retain_dataset)}")
+    print("=== Dataset Format Debug ===")
+    print(f"Dataset type: {type(retain_dataset)}")
+    print(f"Dataset length: {len(retain_dataset)}")
     
-    # 检查前几个样本
+    # Check first few samples
     for i in range(min(num_samples, len(retain_dataset))):
         sample = retain_dataset[i]
-        print(f"\n样本 {i}:")
-        print(f"  类型: {type(sample)}")
+        print(f"\nSample {i}:")
+        print(f"  Type: {type(sample)}")
         if isinstance(sample, dict):
-            print(f"  键: {list(sample.keys())}")
+            print(f"  Keys: {list(sample.keys())}")
             for key, value in sample.items():
                 if isinstance(value, torch.Tensor):
                     print(f"    {key}: tensor shape {value.shape}, dtype {value.dtype}")
                 else:
                     print(f"    {key}: {type(value)} - {value}")
         else:
-            print(f"  值: {sample}")
+            print(f"  Value: {sample}")
 
 
 def eval_acc_debug(
@@ -36,14 +36,14 @@ def eval_acc_debug(
     device="cuda"
 ):
     """
-    调试版本的准确率评估函数
+    Debug version of accuracy evaluation function
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer
     
-    # 首先调试数据集格式
+    # First debug dataset format
     debug_dataset_format(retain_dataset)
     
-    # 加载模型和tokenizer
+    # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
@@ -54,7 +54,7 @@ def eval_acc_debug(
     
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
     
-    # 设置pad token
+    # Set pad token
     try:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -62,28 +62,28 @@ def eval_acc_debug(
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-    # 创建数据加载器
+    # Create data loader
     def collate_fn(batch):
-        print(f"Collate函数被调用，batch大小: {len(batch)}")
-        print(f"第一个样本类型: {type(batch[0])}")
+        print(f"Collate function called, batch size: {len(batch)}")
+        print(f"First sample type: {type(batch[0])}")
         
         if isinstance(batch[0], dict):
-            print(f"第一个样本的键: {list(batch[0].keys())}")
+            print(f"First sample keys: {list(batch[0].keys())}")
             
-            # 检查所有样本的键是否一致
+            # Check if all samples have consistent keys
             all_keys = set()
             for item in batch:
                 all_keys.update(item.keys())
-            print(f"所有样本的键: {all_keys}")
+            print(f"All sample keys: {all_keys}")
             
-            # 尝试提取数据
+            # Try to extract data
             try:
                 if 'input_ids' in batch[0]:
                     input_ids = torch.stack([item['input_ids'] for item in batch])
                     attention_mask = torch.stack([item.get('attention_mask', torch.ones_like(item['input_ids'])) for item in batch])
                     labels = torch.stack([item.get('label', item.get('labels', item['input_ids'])) for item in batch])
                     
-                    print(f"成功提取数据 - input_ids: {input_ids.shape}, attention_mask: {attention_mask.shape}, labels: {labels.shape}")
+                    print(f"Successfully extracted data - input_ids: {input_ids.shape}, attention_mask: {attention_mask.shape}, labels: {labels.shape}")
                     
                     return {
                         'input_ids': input_ids,
@@ -91,13 +91,13 @@ def eval_acc_debug(
                         'label': labels
                     }
                 else:
-                    print("错误：没有找到input_ids键")
+                    print("Error: input_ids key not found")
                     return None
             except Exception as e:
-                print(f"提取数据时出错: {e}")
+                print(f"Error extracting data: {e}")
                 return None
         else:
-            print(f"样本不是字典格式: {type(batch[0])}")
+            print(f"Sample is not in dictionary format: {type(batch[0])}")
             return None
     
     dataloader = DataLoader(
@@ -111,59 +111,59 @@ def eval_acc_debug(
     correct_predictions = 0
     total_predictions = 0
     
-    print("开始评估准确率...")
+    print("Starting accuracy evaluation...")
     
     with torch.no_grad():
-        for i, batch in enumerate(tqdm.tqdm(dataloader, desc="评估进度")):
+        for i, batch in enumerate(tqdm.tqdm(dataloader, desc="Evaluation progress")):
             if batch is None:
-                print(f"跳过批次 {i}（数据格式问题）")
+                print(f"Skipping batch {i} (data format issue)")
                 continue
                 
-            print(f"处理批次 {i}: {type(batch)}")
+            print(f"Processing batch {i}: {type(batch)}")
             
             try:
-                # 将数据移到设备上
+                # Move data to device
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
                 labels = batch['label'].to(device)
                 
-                print(f"批次 {i} 数据形状: input_ids={input_ids.shape}, attention_mask={attention_mask.shape}, labels={labels.shape}")
+                print(f"Batch {i} data shape: input_ids={input_ids.shape}, attention_mask={attention_mask.shape}, labels={labels.shape}")
                 
-                # 前向传播
+                # Forward pass
                 outputs = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     labels=labels
                 )
                 
-                # 获取预测结果
+                # Get prediction results
                 logits = outputs.logits
                 
-                # 获取每个位置的预测token
+                # Get predicted tokens for each position
                 predicted_tokens = torch.argmax(logits, dim=-1)  # [batch_size, seq_len-1]
                 
-                # 计算准确率（忽略padding和-100标签）
+                # Calculate accuracy (ignore padding and -100 labels)
                 valid_mask = (labels != -100) & (attention_mask[:, :-1] == 1)
                 
-                # 比较预测和真实标签
+                # Compare predictions with true labels
                 correct = (predicted_tokens == labels) & valid_mask
                 correct_predictions += correct.sum().item()
                 total_predictions += valid_mask.sum().item()
                 
-                print(f"批次 {i} 结果: 正确={correct.sum().item()}, 总数={valid_mask.sum().item()}")
+                print(f"Batch {i} results: correct={correct.sum().item()}, total={valid_mask.sum().item()}")
                 
             except Exception as e:
-                print(f"处理批次 {i} 时出错: {e}")
+                print(f"Error processing batch {i}: {e}")
                 continue
     
-    # 计算准确率
+    # Calculate accuracy
     accuracy = (correct_predictions / total_predictions * 100) if total_predictions > 0 else 0
     
-    print(f"准确率: {accuracy:.2f}%")
-    print(f"正确预测数: {correct_predictions}")
-    print(f"总预测数: {total_predictions}")
+    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Correct predictions: {correct_predictions}")
+    print(f"Total predictions: {total_predictions}")
     
-    # 保存结果
+    # Save results
     result = {
         "accuracy": accuracy,
         "correct_predictions": correct_predictions,

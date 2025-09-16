@@ -14,10 +14,10 @@ eval_logger = logging.getLogger(__name__)
 
 
 SUBJECTS = {
-    "computer_network": "计算机网络",
-    "operating_system": "操作系统",
-    "computer_architecture": "计算机组成",
-    "college_programming": "大学编程",
+    "computer_network": "Computer Network",
+    "operating_system": "Operating System",
+    "computer_architecture": "Computer Architecture",
+    "college_programming": "College Programming",
     "college_physics": "大学物理",
     "college_chemistry": "大学化学",
     "advanced_mathematics": "高等数学",

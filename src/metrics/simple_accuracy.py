@@ -6,14 +6,14 @@ from torch.utils.data import DataLoader
 
 def extract_retain_from_unlearn_dataset(unlearn_dataset, num_samples=None):
     """
-    从UnlearnDataset中提取retain数据
+    Extract retain data from UnlearnDataset
     
     Args:
-        unlearn_dataset: UnlearnDataset实例
-        num_samples: 要提取的样本数量，如果为None则提取所有
+        unlearn_dataset: UnlearnDataset instance
+        num_samples: Number of samples to extract, if None extract all
     
     Returns:
-        retain_data: 包含retain数据的列表
+        retain_data: List containing retain data
     """
     retain_data = []
     
@@ -36,21 +36,21 @@ def eval_acc(
     device="cuda"
 ):
     """
-    评估模型在retain数据集上的准确率（简化版）
+    Evaluate model accuracy on retain dataset (simplified version)
     
     Args:
-        model_name: 模型名称
-        retain_dataset: 测试数据集（可能是UnlearnDataset或普通数据集）
-        output_dir: 输出目录
-        batch_size: 批次大小
-        device: 设备
+        model_name: Model name
+        retain_dataset: Test dataset (could be UnlearnDataset or regular dataset)
+        output_dir: Output directory
+        batch_size: Batch size
+        device: Device
     
     Returns:
-        accuracy: 准确率（百分比）
+        accuracy: Accuracy (percentage)
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer
     
-    # 加载模型和tokenizer
+    # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
@@ -61,7 +61,7 @@ def eval_acc(
     
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
     
-    # 设置pad token
+    # Set pad token
     try:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -69,19 +69,19 @@ def eval_acc(
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-    # 检查数据集类型并提取retain数据
+    # Check dataset type and extract retain data
     if hasattr(retain_dataset, 'retain_dataset') and retain_dataset.retain_dataset is not None:
-        # 如果是UnlearnDataset，直接使用其retain_dataset
-        print("检测到UnlearnDataset，使用其retain_dataset进行评估")
+        # If it's UnlearnDataset, directly use its retain_dataset
+        print("Detected UnlearnDataset, using its retain_dataset for evaluation")
         actual_dataset = retain_dataset.retain_dataset
     else:
-        # 如果是普通数据集，直接使用
-        print("使用普通数据集进行评估")
+        # If it's a regular dataset, use it directly
+        print("Using regular dataset for evaluation")
         actual_dataset = retain_dataset
     
-    # 创建数据加载器
+    # Create data loader
     def collate_fn(batch):
-        # 处理标准格式的数据
+        # Process standard format data
         return {
             'input_ids': torch.stack([item['input_ids'] for item in batch]),
             'attention_mask': torch.stack([item['attention_mask'] for item in batch]),
@@ -99,42 +99,42 @@ def eval_acc(
     correct_predictions = 0
     total_predictions = 0
     
-    print("开始评估准确率...")
+    print("Starting accuracy evaluation...")
     
     with torch.no_grad():
-        for batch in tqdm.tqdm(dataloader, desc="评估进度"):
-            # 将数据移到设备上
+        for batch in tqdm.tqdm(dataloader, desc="Evaluation progress"):
+            # Move data to device
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels = batch['label'].to(device)
             
-            # 前向传播
+            # Forward pass
             outputs = model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 labels=labels
             )
             
-            # 获取预测结果
+            # Get prediction results
             logits = outputs.logits
             
-            # 获取每个位置的预测token
+            # Get predicted tokens for each position
             predicted_tokens = torch.argmax(logits, dim=-1)  # [batch_size, seq_len]
             
-            # 计算准确率（忽略padding和-100标签）
-            # 确保所有张量大小一致
+            # Calculate accuracy (ignore padding and -100 labels)
+            # Ensure all tensors have consistent size
             valid_mask = (labels != -100) & (attention_mask == 1)
             
-            # 只比较每个样本最后一个有效token的预测是否正确
+            # Only compare the prediction of the last valid token for each sample
             batch_correct = 0
             batch_total = 0
             
             for i in range(len(labels)):
-                # 找到该样本最后一个有效token的位置
+                # Find the position of the last valid token for this sample
                 valid_positions = valid_mask[i].nonzero(as_tuple=True)[0]
                 if len(valid_positions) > 0:
                     last_valid_pos = valid_positions[-1]
-                    # 检查最后一个有效token的预测是否正确
+                    # Check if the prediction of the last valid token is correct
                     if predicted_tokens[i, last_valid_pos] == labels[i, last_valid_pos]:
                         batch_correct += 1
                     batch_total += 1
@@ -142,14 +142,14 @@ def eval_acc(
             correct_predictions += batch_correct
             total_predictions += batch_total
     
-    # 计算准确率
+    # Calculate accuracy
     accuracy = (correct_predictions / total_predictions * 100) if total_predictions > 0 else 0
     
-    print(f"准确率: {accuracy:.2f}%")
-    print(f"正确预测数: {correct_predictions}")
-    print(f"总预测数: {total_predictions}")
+    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Correct predictions: {correct_predictions}")
+    print(f"Total predictions: {total_predictions}")
     
-    # 保存结果
+    # Save results
     result = {
         "accuracy": accuracy,
         "correct_predictions": correct_predictions,
@@ -157,7 +157,7 @@ def eval_acc(
         "model_name": model_name
     }
     
-    # 确保输出目录存在
+    # Ensure output directory exists
     import os
     os.makedirs(output_dir, exist_ok=True)
     
@@ -167,19 +167,19 @@ def eval_acc(
     return accuracy
 
 
-# 在unlearn模型中使用的方法
+# Method used in unlearn model
 def eval_acc_in_unlearn(self, model_name, output_dir=".", batch_size=8):
     """
-    在unlearn模型中使用的准确率评估方法
+    Accuracy evaluation method used in unlearn model
     
     Args:
-        self: unlearn模型实例
-        model_name: 模型名称
-        output_dir: 输出目录
-        batch_size: 批次大小
+        self: unlearn model instance
+        model_name: Model name
+        output_dir: Output directory
+        batch_size: Batch size
     
     Returns:
-        accuracy: 准确率（百分比）
+        accuracy: Accuracy (percentage)
     """
     return eval_acc(
         model_name=model_name,

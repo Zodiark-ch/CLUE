@@ -39,7 +39,7 @@ class Winogrande(BaseDataset):
         def preprocess(examples):
             results = {"input_ids": [], "attention_mask": [], "label": []}
             
-            # 构建text列表
+            # Build text list
             texts = []
             for i in range(len(examples['sentence'])):
                 sample = {
@@ -63,30 +63,30 @@ class Winogrande(BaseDataset):
                     add_special_tokens=True,
                     return_tensors="pt"
                 )
-                    # 正确处理input_ids和label的对应关系
-                full_input_ids = tokenized.input_ids[0]
-                full_attention_mask = tokenized.attention_mask[0]
-                
-                # 找到最后一个非padding token的位置
-                last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
-                
-                # input_ids: 去掉最后一个非padding token
-                input_ids = full_input_ids[:last_non_padding_idx]
-                # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-                # 即：[BOS, token3, token4, ..., last_token]
-                label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
-                # attention_mask: 对应input_ids的长度
-                attention_mask = full_attention_mask[:last_non_padding_idx]
-                
-                # 直接padding到固定长度
-                max_len = 200  # 可以根据需要调整
-                pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
-                
-                # Padding input_ids
-                input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
-                
-                # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
-                label_padded = label.tolist() + [-100] * (max_len - len(label))
+                    # Correctly handle correspondence between input_ids and label
+                    full_input_ids = tokenized.input_ids[0]
+                    full_attention_mask = tokenized.attention_mask[0]
+                    
+                    # Find position of last non-padding token
+                    last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
+                    
+                    # input_ids: remove last non-padding token
+                    input_ids = full_input_ids[:last_non_padding_idx]
+                    # label: remove first token after BOS token, keep BOS, remove second token
+                    # i.e.: [BOS, token3, token4, ..., last_token]
+                    label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
+                    # attention_mask: corresponding to input_ids length
+                    attention_mask = full_attention_mask[:last_non_padding_idx]
+                    
+                    # Directly pad to fixed length
+                    max_len = 200  # Can be adjusted as needed
+                    pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+                    
+                    # Padding input_ids
+                    input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
+                    
+                    # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
+                    label_padded = label.tolist() + [-100] * (max_len - len(label))
                 
                 # Padding attention_mask
                 attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))

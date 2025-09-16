@@ -57,7 +57,7 @@ class CL_FT(CL):
 
         forget_loss = outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -73,7 +73,7 @@ class CL_FT(CL):
                 retain_loss += retain_outputs.loss
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = forget_loss + self.gamma * retain_loss
@@ -107,7 +107,7 @@ class CL_KL(CL):
 
         forget_loss = outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -129,7 +129,7 @@ class CL_KL(CL):
                 retain_loss += kl_loss(prob_retain_p, prob_retain_q)
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = forget_loss + self.gamma * retain_loss

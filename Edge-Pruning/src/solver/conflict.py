@@ -13,30 +13,30 @@ sys.path.append(
 class Circuit:
     def __init__(self, json_file_path, leaf_nodes=None):
         """
-        初始化Circuit类
+        Initialize Circuit class
         Args:
-            json_file_path: JSON文件路径，包含circuit数据
-            leaf_nodes: 叶子节点列表，用于拓扑排序构建circuit
+            json_file_path: JSON file path containing circuit data
+            leaf_nodes: List of leaf nodes for topological sorting to build circuit
         """
         self.circuit = {}
-        self.NOR = False  # 默认NOR参数
+        self.NOR = False  # Default NOR parameter
         self.load_circuit(json_file_path, leaf_nodes)
     
     def load_circuit(self, json_file_path, leaf_nodes=None):
         """
-        从JSON文件加载circuit数据并按照拓扑排序重组为字典结构
+        Load circuit data from JSON file and reorganize into dictionary structure by topological sorting
         Args:
-            json_file_path: JSON文件路径
-            leaf_nodes: 叶子节点列表，用于拓扑排序构建circuit
+            json_file_path: JSON file path
+            leaf_nodes: List of leaf nodes for topological sorting to build circuit
         """
         try:
             with open(json_file_path, 'r') as f:
                 data = json.load(f)
             
-            # 初始化known_node_list，从叶子节点开始
+            # Initialize known_node_list starting from leaf nodes
             known_node_list = set(leaf_nodes) if leaf_nodes else set()
             
-            # 创建所有to_node的映射，用于检查依赖关系
+            # Create mapping of all to_nodes for checking dependencies
             to_node_dependencies = {}
             for item in data:
                 if len(item) == 3:
@@ -45,9 +45,9 @@ class Circuit:
                         to_node_dependencies[to_node] = []
                     to_node_dependencies[to_node].append((from_node, node_type))
             
-            # 拓扑排序构建circuit
+            # Topological sorting to build circuit
             while to_node_dependencies:
-                # 找到所有依赖都已满足的to_node
+                # Find all to_nodes whose dependencies are satisfied
                 ready_to_process = []
                 for to_node, dependencies in to_node_dependencies.items():
                     all_dependencies_met = True
@@ -59,10 +59,10 @@ class Circuit:
                     if all_dependencies_met:
                         ready_to_process.append(to_node)
                 
-                # 如果没有找到可以处理的节点，说明存在循环依赖
+                # If no processable nodes found, circular dependency exists
                 if not ready_to_process:
-                    print(f"警告：存在循环依赖，无法完成拓扑排序")
-                    # 将剩余的节点直接加入circuit
+                    print(f"Warning: Circular dependency exists, cannot complete topological sorting")
+                    # Add remaining nodes directly to circuit
                     # for to_node, dependencies in to_node_dependencies.items():
                     #     if to_node not in self.circuit:
                     #         self.circuit[to_node] = {}
@@ -72,11 +72,11 @@ class Circuit:
                     #         self.circuit[to_node][node_type].append(from_node)
                     break
                 
-                # 处理所有可以处理的to_node
+                # Process all processable to_nodes
                 for to_node in ready_to_process:
                     dependencies = to_node_dependencies[to_node]
                     
-                    # 构建circuit结构
+                    # Build circuit structure
                     if to_node not in self.circuit:
                         self.circuit[to_node] = {}
                     
@@ -85,58 +85,58 @@ class Circuit:
                             self.circuit[to_node][node_type] = []
                         self.circuit[to_node][node_type].append(from_node)
                     
-                    # 将to_node加入known_node_list
+                    # Add to_node to known_node_list
                     known_node_list.add(to_node)
                     
-                    # 从待处理列表中删除
+                    # Remove from pending list
                     del to_node_dependencies[to_node]
                     
         except FileNotFoundError:
-            print(f"错误：找不到文件 {json_file_path}")
+            print(f"Error: File not found {json_file_path}")
         except json.JSONDecodeError:
-            print(f"错误：JSON文件格式不正确 {json_file_path}")
+            print(f"Error: JSON file format incorrect {json_file_path}")
         except Exception as e:
-            print(f"加载circuit数据时发生错误：{e}")
+            print(f"Error loading circuit data: {e}")
     
     def bool_validation(self, VALUE_retain, VALUE_forget, input_retain=None, input_forget=None, NOR=None):
         """
-        布尔验证circuit中的节点赋值
+        Boolean validation of node assignments in circuit
         Args:
-            VALUE_retain: 包含[node, bool_value]的列表，用于非NOR模式
-            VALUE_forget: 包含[node, bool_value]的列表，用于NOR模式
-            input_retain: 包含叶子节点[node, bool_value]的列表，用于非NOR模式
-            input_forget: 包含叶子节点[node, bool_value]的列表，用于NOR模式
-            NOR: 是否使用NOR模式（如果为None则使用实例的NOR属性）
+            VALUE_retain: List containing [node, bool_value] for non-NOR mode
+            VALUE_forget: List containing [node, bool_value] for NOR mode
+            input_retain: List containing leaf nodes [node, bool_value] for non-NOR mode
+            input_forget: List containing leaf nodes [node, bool_value] for NOR mode
+            NOR: Whether to use NOR mode (if None, use instance NOR attribute)
         Returns:
-            bool: 如果验证通过返回True，否则返回False
-            list: 如果验证通过，返回[node, numeric_value]的列表，否则返回空列表
+            bool: Returns True if validation passes, False otherwise
+            list: Returns list of [node, numeric_value] if validation passes, empty list otherwise
         """
-        # 如果NOR参数为None，使用实例的NOR属性
+        # If NOR parameter is None, use instance NOR attribute
         if NOR is None:
             NOR = self.NOR
         
-        # 创建实时value的list，包含当前circuit的所有node的取值
+        # Create real-time value list containing all node values in current circuit
         real_time_values = {}
         
-        # 收集circuit中的所有节点
+        # Collect all nodes in circuit
         all_nodes = set()
         for to_node, type_groups in self.circuit.items():
             all_nodes.add(to_node)
             for from_nodes in type_groups.values():
                 all_nodes.update(from_nodes)
         
-        # 初始化实时value的list
+        # Initialize real-time value list
         for node in all_nodes:
             node_value = None
             
             if NOR:
-                # 如果是NOR模式，参考VALUE_forget
+                # If NOR mode, reference VALUE_forget
                 for n, value in VALUE_forget:
                     if n == node:
                         node_value = value
                         break
             else:
-                # 如果不是NOR模式，参考VALUE_retain
+                # If not NOR mode, reference VALUE_retain
                 for n, value in VALUE_retain:
                     if n == node:
                         node_value = value
@@ -144,35 +144,35 @@ class Circuit:
             
             real_time_values[node] = node_value
         
-        # 更新input_retain和input_forget中的叶子节点值
+        # Update leaf node values in input_retain and input_forget
         if NOR:
-            # NOR模式：使用input_forget更新叶子节点值
+            # NOR mode: use input_forget to update leaf node values
             for node, value in input_forget:
                 if node in real_time_values:
                     real_time_values[node] = value
         else:
-            # 非NOR模式：使用input_retain更新叶子节点值
+            # Non-NOR mode: use input_retain to update leaf node values
             if input_retain is not None:
                 for node, value in input_retain:
                     if node in real_time_values:
                         real_time_values[node] = value
         
         
-        # 对self.circuit中的每个key进行bool计算
+        # Perform bool calculation for each key in self.circuit
         for to_node, type_groups in self.circuit.items():
             for node_type, from_nodes in type_groups.items():
-                # 获取from_node的值
+                # Get from_node value
                 from_node_values = []
                 for from_node in from_nodes:
                     from_node_value = real_time_values.get(from_node)
                     if from_node_value is None:
-                        # 如果from_node的值为None，无法进行计算
+                        # If from_node value is None, cannot perform calculation
                         return False, []
                     from_node_values.append(from_node_value)
                 
-                # 根据NOR模式和节点类型进行bool计算
+                # Perform bool calculation based on NOR mode and node type
                 if NOR:
-                    # NOR模式：所有的from_node先取非
+                    # NOR mode: all from_nodes are negated first
                     inverted_from_values = [not val for val in from_node_values]
                     
                     if node_type in ["OR", "ADDER"]:
@@ -182,10 +182,10 @@ class Circuit:
                         # AND: compute_result = from_node1 or from_node2 or from_node3 ...
                         compute_result = any(inverted_from_values)
                     else:
-                        # 未知节点类型
+                        # Unknown node type
                         return False, []
                 else:
-                    # 非NOR模式：from_node值直接使用
+                    # Non-NOR mode: from_node values used directly
                     if node_type in ["AND", "ADDER"]:
                         # AND/ADDER: compute_result = from_node1 and from_node2 and from_node3 ...
                         compute_result = all(from_node_values)
@@ -193,20 +193,20 @@ class Circuit:
                         # OR: compute_result = from_node1 or from_node2 or from_node3 ...
                         compute_result = any(from_node_values)
                     else:
-                        # 未知节点类型
+                        # Unknown node type
                         return False, []
                 
-                # 检查to_node的值
+                # Check to_node value
                 to_node_value = real_time_values.get(to_node)
                 
                 if to_node_value is None:
-                    # 如果to_node的值为None，将compute_result赋值给to_node
+                    # If to_node value is None, assign compute_result to to_node
                     if NOR:
                         real_time_values[to_node] = not compute_result
                     else:
                         real_time_values[to_node] = compute_result
                 else:
-                    # 如果to_node不为None，判断compute_result和to_node是否相等，因为to_node_value要取非，所以相等就是不相等
+                    # If to_node is not None, check if compute_result and to_node are equal, since to_node_value needs negation, equal means not equal
                     if NOR:
                         if compute_result == to_node_value:
                             return False, []
@@ -214,20 +214,20 @@ class Circuit:
                         if compute_result != to_node_value:
                             return False, []
         
-        # 验证通过，返回每个节点和实时value的list中的value搭配起来的list
+        # Validation passed, return list of each node paired with value from real-time value list
         
         return True, real_time_values
 
 def parse_args():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("-circuit1", "--circuit1", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/cyber_edges/edges_bool.json")
-    parser.add_argument("-circuit2", "--circuit2", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/winogrande_edges/edges_bool.json")
-    parser.add_argument("-circuit3", "--circuit3", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/sst2_edges/edges_bool.json")
-    parser.add_argument("-circuit4", "--circuit4", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/bool_edges/edges_bool.json")
-    parser.add_argument("-circuit5", "--circuit5", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/ioi_edges/edges_bool.json")
-    parser.add_argument("-circuit6", "--circuit6", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/gp_edges/edges_bool.json")
-    parser.add_argument("-circuit7", "--circuit7", type=str, default="/home/lthpc/hangc/CSAT/Edge-Pruning/data/runs/induction_edges/edges_bool.json")
+    parser.add_argument("-circuit1", "--circuit1", type=str, default="")
+    parser.add_argument("-circuit2", "--circuit2", type=str, default="")
+    parser.add_argument("-circuit3", "--circuit3", type=str, default="")
+    parser.add_argument("-circuit4", "--circuit4", type=str, default="")
+    parser.add_argument("-circuit5", "--circuit5", type=str, default="")
+    parser.add_argument("-circuit6", "--circuit6", type=str, default="")
+    parser.add_argument("-circuit7", "--circuit7", type=str, default="")
     parser.add_argument("-w", "--with_embedding_nodes", action="store_true", default=True)
     
     args = parser.parse_args()
@@ -239,21 +239,21 @@ def parse_args():
 
 def initialize_values(args, leaf_nodes_by_circuit):
     """
-    根据args中的circuit文件初始化VALUE_retain、VALUE_forget、input_retain和input_forget
+    Initialize VALUE_retain, VALUE_forget, input_retain and input_forget based on circuit files in args
     Args:
-        args: 包含circuit文件路径的参数对象
-        leaf_nodes_by_circuit: 每个circuit的叶子节点字典
+        args: Parameter object containing circuit file paths
+        leaf_nodes_by_circuit: Dictionary of leaf nodes for each circuit
     Returns:
-        tuple: (VALUE_retain, VALUE_forget, input_retain, input_forget) 四个包含[node, bool_value]的列表
+        tuple: (VALUE_retain, VALUE_forget, input_retain, input_forget) Four lists containing [node, bool_value]
     """
     VALUE_retain = []
     VALUE_forget = []
     input_retain = []
     input_forget = []
     
-    # 获取所有circuit文件路径
+    # Get all circuit file paths
     circuit_files = []
-    for i in range(1, 7):  # 检查circuit1到circuit4
+    for i in range(1, 7):  # Check circuit1 to circuit6
         circuit_attr = f"circuit{i}"
         if hasattr(args, circuit_attr):
             circuit_path = getattr(args, circuit_attr)
@@ -261,19 +261,19 @@ def initialize_values(args, leaf_nodes_by_circuit):
                 circuit_files.append((i, circuit_path))
     
     if not circuit_files:
-        print("错误：没有找到有效的circuit文件！")
+        print("Error: No valid circuit files found!")
         return VALUE_retain, VALUE_forget, input_retain, input_forget
     
-    print(f"找到 {len(circuit_files)} 个circuit文件")
+    print(f"Found {len(circuit_files)} circuit files")
     
-    # 处理每个circuit文件
+    # Process each circuit file
     for circuit_num, circuit_path in circuit_files:
         try:
-            # 直接加载JSON数据来获取所有节点，不依赖Circuit类
+            # Load JSON data directly to get all nodes, without relying on Circuit class
             with open(circuit_path, 'r') as f:
                 data = json.load(f)
             
-            # 收集该circuit中的所有节点
+            # Collect all nodes in this circuit
             circuit_nodes = set()
             for item in data:
                 if len(item) == 3:
@@ -282,50 +282,50 @@ def initialize_values(args, leaf_nodes_by_circuit):
                     circuit_nodes.add(to_node)
             
             circuit_nodes_list = list(circuit_nodes)
-            print(f"Circuit{circuit_num} ({circuit_path}) 包含 {len(circuit_nodes_list)} 个节点")
+            print(f"Circuit{circuit_num} ({circuit_path}) contains {len(circuit_nodes_list)} nodes")
             
-            # 根据circuit编号分配节点
+            # Assign nodes based on circuit number
             if circuit_num == 1:
-                # circuit1的所有节点添加到VALUE_forget，值为False
+                # Add all nodes from circuit1 to VALUE_forget with value False
                 for node in circuit_nodes_list:
                     VALUE_forget.append([node, False])
-                print(f"  → 添加到VALUE_forget（取值为False）")
+                print(f"  → Added to VALUE_forget (value: False)")
             else:
-                # 其他circuit的所有节点添加到VALUE_retain，值为True
+                # Add all nodes from other circuits to VALUE_retain with value True
                 for node in circuit_nodes_list:
                     VALUE_retain.append([node, True])
-                print(f"  → 添加到VALUE_retain（取值为True）")
+                print(f"  → Added to VALUE_retain (value: True)")
                 
         except Exception as e:
-            print(f"处理circuit{circuit_num}时发生错误：{e}")
+            print(f"Error occurred while processing circuit{circuit_num}: {e}")
             continue
     
-    # 初始化input_forget和input_retain
-    print("\n初始化input_forget和input_retain...")
+    # Initialize input_forget and input_retain
+    print("\nInitializing input_forget and input_retain...")
     
-    # input_forget的节点就是leaf_nodes_by_circuit[1]的节点，value默认为False
+    # input_forget nodes are leaf_nodes_by_circuit[1] nodes, value defaults to False
     if 1 in leaf_nodes_by_circuit:
         circuit1_leaf_nodes = leaf_nodes_by_circuit[1]
         for node in circuit1_leaf_nodes:
             input_forget.append([node, False])
-        print(f"  input_forget: {len(input_forget)} 个节点（来自Circuit1的叶子节点，值默认为False）")
+        print(f"  input_forget: {len(input_forget)} nodes (from Circuit1 leaf nodes, value defaults to False)")
     else:
-        print("  警告：没有找到Circuit1的叶子节点")
+        print("  Warning: No Circuit1 leaf nodes found")
     
-    # input_retain的节点就是leaf_nodes_by_circuit[2:]的所有节点的集合，value默认为True
+    # input_retain nodes are the set of all nodes from leaf_nodes_by_circuit[2:], value defaults to True
     all_other_leaf_nodes = set()
-    for circuit_num in range(2, 7):  # circuit2到circuit4
+    for circuit_num in range(2, 7):  # circuit2 to circuit6
         if circuit_num in leaf_nodes_by_circuit:
             all_other_leaf_nodes.update(leaf_nodes_by_circuit[circuit_num])
     
     for node in all_other_leaf_nodes:
         input_retain.append([node, True])
-    print(f"  input_retain: {len(input_retain)} 个节点（来自Circuit2-4的叶子节点，值默认为True）")
+    print(f"  input_retain: {len(input_retain)} nodes (from Circuit2-6 leaf nodes, value defaults to True)")
     
-    # 对所有四个列表进行去重处理
-    #print("\n进行去重处理...")
+    # Deduplicate all four lists
+    #print("\nPerforming deduplication...")
     
-    # 去重VALUE_retain
+    # Deduplicate VALUE_retain
     seen_nodes = set()
     unique_VALUE_retain = []
     for node, value in VALUE_retain:
@@ -333,9 +333,9 @@ def initialize_values(args, leaf_nodes_by_circuit):
             seen_nodes.add(node)
             unique_VALUE_retain.append([node, value])
     VALUE_retain = unique_VALUE_retain
-    #print(f"  VALUE_retain去重后: {len(VALUE_retain)} 个节点")
+    #print(f"  VALUE_retain after deduplication: {len(VALUE_retain)} nodes")
     
-    # 去重VALUE_forget
+    # Deduplicate VALUE_forget
     seen_nodes = set()
     unique_VALUE_forget = []
     for node, value in VALUE_forget:
@@ -343,9 +343,9 @@ def initialize_values(args, leaf_nodes_by_circuit):
             seen_nodes.add(node)
             unique_VALUE_forget.append([node, value])
     VALUE_forget = unique_VALUE_forget
-    #print(f"  VALUE_forget去重后: {len(VALUE_forget)} 个节点")
+    #print(f"  VALUE_forget after deduplication: {len(VALUE_forget)} nodes")
     
-    # 去重input_retain
+    # Deduplicate input_retain
     seen_nodes = set()
     unique_input_retain = []
     for node, value in input_retain:
@@ -353,9 +353,9 @@ def initialize_values(args, leaf_nodes_by_circuit):
             seen_nodes.add(node)
             unique_input_retain.append([node, value])
     input_retain = unique_input_retain
-    #print(f"  input_retain去重后: {len(input_retain)} 个节点")
+    #print(f"  input_retain after deduplication: {len(input_retain)} nodes")
     
-    # 去重input_forget
+    # Deduplicate input_forget
     seen_nodes = set()
     unique_input_forget = []
     for node, value in input_forget:
@@ -363,7 +363,7 @@ def initialize_values(args, leaf_nodes_by_circuit):
             seen_nodes.add(node)
             unique_input_forget.append([node, value])
     input_forget = unique_input_forget
-    #print(f"  input_forget去重后: {len(input_forget)} 个节点")
+    #print(f"  input_forget after deduplication: {len(input_forget)} nodes")
     
     return VALUE_retain, VALUE_forget, input_retain, input_forget
 
@@ -371,39 +371,39 @@ def initialize_values(args, leaf_nodes_by_circuit):
 
 def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
     """
-    修改VALUE_retain, VALUE_forget, input_retain, input_forget的值
+    Modify values of VALUE_retain, VALUE_forget, input_retain, input_forget
     Args:
-        VALUE_retain: 保留节点列表 [[node, bool_value], ...]
-        VALUE_forget: 遗忘节点列表 [[node, bool_value], ...]
-        input_retain: 输入保留节点列表 [[node, bool_value], ...]
-        input_forget: 输入遗忘节点列表 [[node, bool_value], ...]
-        circuits: 所有circuit的字典 {circuit_num: circuit}
+        VALUE_retain: Retain node list [[node, bool_value], ...]
+        VALUE_forget: Forget node list [[node, bool_value], ...]
+        input_retain: Input retain node list [[node, bool_value], ...]
+        input_forget: Input forget node list [[node, bool_value], ...]
+        circuits: Dictionary of all circuits {circuit_num: circuit}
     Returns:
-        tuple: (VALUE_retain, VALUE_forget, input_retain, input_forget) 修改后的四个列表
+        tuple: (VALUE_retain, VALUE_forget, input_retain, input_forget) Modified four lists
     """
     import copy
     
-    # 创建副本以避免修改原始数据
+    # Create a copy to avoid modifying original data
     VALUE_retain = copy.deepcopy(VALUE_retain)
     VALUE_forget = copy.deepcopy(VALUE_forget)
     input_retain = copy.deepcopy(input_retain)
     input_forget = copy.deepcopy(input_forget)
     
-    print("\n开始执行modify函数...")
+    print("\nStarting modify function...")
     
-    # 1. 将VALUE_forget和VALUE_retain的所有node的value都从bool值变成None
-    print("1. 将所有VALUE_forget和VALUE_retain的值设为None...")
+    # 1. Set all node values in VALUE_forget and VALUE_retain to None
+    print("1. Setting all VALUE_forget and VALUE_retain values to None...")
     for i in range(len(VALUE_forget)):
         VALUE_forget[i][1] = None
     for i in range(len(VALUE_retain)):
         VALUE_retain[i][1] = None
     
-    # 2. 查找那些只在circuit1中出现，在其他circuit中不存在的node
-    print("2. 查找只在circuit1中出现的节点...")
+    # 2. Find nodes that appear only in circuit1 and not in other circuits
+    print("2. Finding nodes that appear only in circuit1...")
     circuit1_nodes = set()
     other_circuit_nodes = set()
     
-    # 获取circuit1的所有节点
+    # Get all nodes of circuit1
     if 1 in circuits:
         circuit1 = circuits[1]
         for to_node, type_groups in circuit1.circuit.items():
@@ -411,7 +411,7 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
             for from_nodes in type_groups.values():
                 circuit1_nodes.update(from_nodes)
     
-    # 获取其他circuit的所有节点
+    # Get all nodes of other circuits
     for circuit_num, circuit in circuits.items():
         if circuit_num != 1:
             for to_node, type_groups in circuit.circuit.items():
@@ -419,35 +419,35 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                 for from_nodes in type_groups.values():
                     other_circuit_nodes.update(from_nodes)
     
-    # # 只在circuit1中出现的节点
+    # # Nodes appearing only in circuit1
     # only_in_circuit1 = circuit1_nodes - other_circuit_nodes
     # for node in only_in_circuit1:
-    #     # 在VALUE_forget中设置值为False
+    #     # Set value to False in VALUE_forget
     #     for i, (n, _) in enumerate(VALUE_forget):
     #         if n == node:
     #             VALUE_forget[i][1] = False
     #             break
-    # print(f"  找到 {len(only_in_circuit1)} 个只在circuit1中出现的节点，已设置为False")
+    # print(f"  Found {len(only_in_circuit1)} nodes appearing only in circuit1, set to False")
     
-    # # 3. 查找那些只在其他circuit中出现，并且在circuit1中不存在的node
-    # print("3. 查找只在其他circuit中出现的节点...")
+    # # 3. Find nodes that appear only in other circuits and not in circuit1
+    # # print("3. Finding nodes that appear only in other circuits...")
     # only_in_other_circuits = other_circuit_nodes - circuit1_nodes
     # for node in only_in_other_circuits:
-    #     # 在VALUE_retain中设置值为True
+    #     # Set value to True in VALUE_retain
     #     for i, (n, _) in enumerate(VALUE_retain):
     #         if n == node:
     #             VALUE_retain[i][1] = True
     #             break
-    # print(f"  找到 {len(only_in_other_circuits)} 个只在其他circuit中出现的节点，已设置为True")
+    # # print(f"  Found {len(only_in_other_circuits)} nodes appearing only in other circuits, set to True")
     
-    # 4. 从circuit1中的resid_post开始，递归处理OR和ADDER类型的from_node
-    print("4. 处理circuit1中的OR和ADDER类型节点...")
+    # 4. Starting from resid_post in circuit1, recursively process OR and ADDER type from_nodes
+    print("4. Processing OR and ADDER type nodes in circuit1...")
     if 1 in circuits:
         circuit1 = circuits[1]
         processed_nodes = set()
         
         def process_circuit1_node(node):
-            """递归处理circuit1中的节点"""
+            """Recursively process nodes in circuit1"""
             if node in processed_nodes:
                 return
             
@@ -457,7 +457,7 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                 for node_type, from_nodes in circuit1.circuit[node].items():
                     if node_type in ["OR", "ADDER"]:
                         for from_node in from_nodes:
-                            # 检查from_node在VALUE_forget中的值
+                            # Check from_node value in VALUE_forget
                             from_node_value = None
                             for i, (n, v) in enumerate(VALUE_forget):
                                 if n == from_node:
@@ -465,20 +465,20 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                                     break
                             
                             if from_node_value is None:
-                                # 设置为False
+                                # Set to False
                                 for i, (n, v) in enumerate(VALUE_forget):
                                     if n == from_node:
                                         VALUE_forget[i][1] = False
                                         break
-                                #print(f"    节点 {from_node} 设置为False")
+                                #print(f"    Node {from_node} set to False")
                             elif from_node_value != False:
-                                # 报错
-                                raise ValueError(f"节点 {from_node} 的值不是False，而是 {from_node_value}")
+                                # Error
+                                raise ValueError(f"Node {from_node} value is not False, but {from_node_value}")
                             
-                            # 递归处理这个from_node
+                            # Recursively process this from_node
                             process_circuit1_node(from_node)
         
-        # 从resid_post开始处理
+        # Start processing from resid_post
         resid_post_nodes = []
         for to_node in circuit1.circuit.keys():
             if "resid_post" in to_node:
@@ -489,17 +489,17 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                 resid_post_nodes.append(to_node)
         
         for resid_post in resid_post_nodes:
-            print(f"  从 {resid_post} 开始处理...")
+            print(f"  Starting processing from {resid_post}...")
             process_circuit1_node(resid_post)
     
-    # 5. 从其他circuit中的resid_post开始，递归处理AND和ADDER类型的from_node
-    print("5. 处理其他circuit中的AND和ADDER类型节点...")
+    # 5. Starting from resid_post in other circuits, recursively process AND and ADDER type from_nodes
+    print("5. Processing AND and ADDER type nodes in other circuits...")
     for circuit_num, circuit in circuits.items():
         if circuit_num != 1:
             processed_nodes = set()
             
             def process_other_circuit_node(node):
-                """递归处理其他circuit中的节点"""
+                """Recursively process nodes in other circuits"""
                 if node in processed_nodes:
                     return
                 
@@ -509,7 +509,7 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                     for node_type, from_nodes in circuit.circuit[node].items():
                         if node_type in ["AND", "ADDER"]:
                             for from_node in from_nodes:
-                                # 检查from_node在VALUE_retain中的值
+                                # Check from_node value in VALUE_retain
                                 from_node_value = None
                                 for i, (n, v) in enumerate(VALUE_retain):
                                     if n == from_node:
@@ -517,20 +517,20 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                                         break
                                 
                                 if from_node_value is None:
-                                    # 设置为True
+                                    # Set to True
                                     for i, (n, v) in enumerate(VALUE_retain):
                                         if n == from_node:
                                             VALUE_retain[i][1] = True
                                             break
-                                    #print(f"    节点 {from_node} 设置为True")
+                                    #print(f"    Node {from_node} set to True")
                                 elif from_node_value != True:
-                                    # 报错
-                                    raise ValueError(f"节点 {from_node} 的值不是True，而是 {from_node_value}")
+                                    # Error
+                                    raise ValueError(f"Node {from_node} value is not True, but {from_node_value}")
                                 
-                                # 递归处理这个from_node
+                                # Recursively process this from_node
                                 process_other_circuit_node(from_node)
             
-            # 从resid_post开始处理
+            # Start processing from resid_post
             resid_post_nodes = []
             for to_node in circuit.circuit.keys():
                 if "resid_post" in to_node:
@@ -541,131 +541,55 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
                     resid_post_nodes.append(to_node)
             
             for resid_post in resid_post_nodes:
-                print(f"  从Circuit{circuit_num}的 {resid_post} 开始处理...")
+                print(f"  Starting processing from Circuit{circuit_num}'s {resid_post}...")
                 process_other_circuit_node(resid_post)
     
-    # # 6. 处理circuit1中的AND类型节点
-    # print("6. 处理circuit1中的AND类型节点...")
-    # if 1 in circuits:
-    #     circuit1 = circuits[1]
-    #     for to_node, type_groups in circuit1.circuit.items():
-    #         for node_type, from_nodes in type_groups.items():
-    #             if node_type == "AND":
-    #                 # 检查是否存在任意一个from_node的value为False
-    #                 has_false_from_node = False
-    #                 for from_node in from_nodes:
-    #                     for i, (n, v) in enumerate(VALUE_forget):
-    #                         if n == from_node and v == False:
-    #                             has_false_from_node = True
-    #                             break
-    #                     if has_false_from_node:
-    #                         break
-                    
-    #                 if has_false_from_node:
-    #                     # 将其他from_node在VALUE_forget中的值设置为False
-    #                     for from_node in from_nodes:
-    #                         # 检查这个from_node是否在input_forget中
-    #                         in_input_forget = False
-    #                         for n, v in input_forget:
-    #                             if n == from_node:
-    #                                 in_input_forget = True
-    #                                 break
-                            
-    #                         if in_input_forget:
-    #                             # 在VALUE_forget中设置值为False
-    #                             for i, (n, v) in enumerate(VALUE_forget):
-    #                                 if n == from_node and VALUE_forget[i][1] is None:
-    #                                     VALUE_forget[i][1] = True
-    #                                     print(f"    节点 {from_node} 在VALUE_forget中设置为False")
-    #                                     break
+
     
-    # # 7. 处理其他circuit中的OR类型节点
-    # print("7. 处理其他circuit中的OR类型节点...")
-    # seen_node_list = []
-    # for circuit_num, circuit in circuits.items():
-    #     if circuit_num != 1:
-    #         for to_node, type_groups in circuit.circuit.items():
-    #             for node_type, from_nodes in type_groups.items():
-    #                 if node_type == "OR":
-    #                     # 检查是否存在任意一个from_node的value为True
-    #                     has_true_from_node = False
-    #                     for from_node in from_nodes:
-    #                         # 如果from_node在seen_node_list中，跳过
-    #                         if from_node in seen_node_list:
-    #                             continue
-    #                         for i, (n, v) in enumerate(VALUE_retain):
-    #                             if n == from_node and v == True:
-    #                                 has_true_from_node = True
-    #                                 break
-    #                         if has_true_from_node:
-    #                             break
-                        
-    #                     if has_true_from_node:
-    #                         # 将其他from_node在VALUE_retain中的值设置为True
-    #                         for from_node in from_nodes:
-    #                             if from_node in seen_node_list:
-    #                                 continue
-    #                             # 检查这个from_node是否在input_retain中
-    #                             in_input_retain = False
-    #                             for n, v in input_retain:
-    #                                 if n == from_node:
-    #                                     in_input_retain = True
-    #                                     break
-                                
-    #                             if in_input_retain:
-    #                                                                         # 在VALUE_retain中设置值为True
-    #                                     for i, (n, v) in enumerate(VALUE_retain):
-    #                                         if n == from_node and VALUE_retain[i][1] is None:
-    #                                             VALUE_retain[i][1] = False
-    #                                             #print(f"    节点 {from_node} 在VALUE_retain中设置为True")
-    #                                         elif n == from_node and VALUE_retain[i][1] ==False:
-    #                                             seen_node_list.append(from_node)
-    #                                             break
-    
-    # 8. 更新input_retain的值
-    print("8. 更新input_retain的值...")
-    # 将input_retain中所有节点的value设为None
+    # 8. Update input_retain values
+    print("8. Updating input_retain values...")
+    # Set all node values in input_retain to None
     for i in range(len(input_retain)):
         input_retain[i][1] = None
     
-    # 遍历VALUE_retain，更新input_retain中的值
+    # Iterate VALUE_retain, update values in input_retain
     for node, value in VALUE_retain:
         if value is not None:
             for i, (n, v) in enumerate(input_retain):
                 if n == node:
                     input_retain[i][1] = value
-                    print(f"    节点 {node} 在input_retain中更新为 {value}")
+                    print(f"    Node {node} in input_retain updated to {value}")
                     break
     
-    # 9. 更新input_forget的值
-    print("9. 更新input_forget的值...")
-    # 将input_forget中所有节点的value设为None
+    # 9. Update input_forget values
+    print("9. Updating input_forget values...")
+    # Set all node values in input_forget to None
     for i in range(len(input_forget)):
         input_forget[i][1] = None
     
-    # 遍历VALUE_forget，更新input_forget中的值
+    # Iterate VALUE_forget, update values in input_forget
     for node, value in VALUE_forget:
         if value is not None:
             for i, (n, v) in enumerate(input_forget):
                 if n == node:
                     input_forget[i][1] = value
-                    print(f"    节点 {node} 在input_forget中更新为 {value}")
+                    print(f"    Node {node} in input_forget updated to {value}")
                     break
     
-    # 10. 统计value=None的节点数量
-    print("10. 统计value=None的节点数量...")
+    # 10. Count nodes with value=None
+    print("10. Counting nodes with value=None...")
     none_count_retain = sum(1 for _, v in VALUE_retain if v is None)
     none_count_forget = sum(1 for _, v in VALUE_forget if v is None)
     none_count_input_retain = sum(1 for _, v in input_retain if v is None)
     none_count_input_forget = sum(1 for _, v in input_forget if v is None)
     
-    print(f"  VALUE_retain中value=None的节点数量: {none_count_retain}")
-    print(f"  VALUE_forget中value=None的节点数量: {none_count_forget}")
-    print(f"  input_retain中value=None的节点数量: {none_count_input_retain}")
-    print(f"  input_forget中value=None的节点数量: {none_count_input_forget}")
+    print(f"  Nodes with value=None in VALUE_retain: {none_count_retain}")
+    print(f"  Nodes with value=None in VALUE_forget: {none_count_forget}")
+    print(f"  Nodes with value=None in input_retain: {none_count_input_retain}")
+    print(f"  Nodes with value=None in input_forget: {none_count_input_forget}")
     
-    # 11. 统计input_retain和input_forget中为None的节点，构成uncertain_node_list
-    print("11. 统计不确定节点列表...")
+    # 11. Count nodes with None in input_retain and input_forget to form uncertain_node_list
+    print("11. Counting uncertain node list...")
     uncertain_node_list_retain = []
     uncertain_node_list_forget = []
     
@@ -677,38 +601,38 @@ def modify(VALUE_retain, VALUE_forget, input_retain, input_forget, circuits):
         if value is None:
             uncertain_node_list_forget.append(node)
     
-    print(f"  uncertain_node_list_retain: {len(uncertain_node_list_retain)} 个节点")
+    print(f"  uncertain_node_list_retain: {len(uncertain_node_list_retain)} nodes")
     if uncertain_node_list_retain:
-        print(f"    节点列表: {uncertain_node_list_retain}")
+        print(f"    Node list: {uncertain_node_list_retain}")
     
-    print(f"  uncertain_node_list_forget: {len(uncertain_node_list_forget)} 个节点")
+    print(f"  uncertain_node_list_forget: {len(uncertain_node_list_forget)} nodes")
     if uncertain_node_list_forget:
-        print(f"    节点列表: {uncertain_node_list_forget}")
+        print(f"    Node list: {uncertain_node_list_forget}")
     
-    print("modify函数执行完成")
+    print("modify function execution completed")
     return VALUE_retain, VALUE_forget, input_retain, input_forget, uncertain_node_list_retain, uncertain_node_list_forget
 
 
 def investigate_leaf_nodes(circuit_files):
     """
-    调查每个circuit的叶子节点
-    叶子节点的定义：该node仅出现在from_node中，不出现在to_node中
+    Investigate leaf nodes of each circuit
+    Definition of leaf node: a node that appears only in from_node, not in to_node
     Args:
-        circuit_files: 包含(circuit_num, circuit_path)元组的列表
+        circuit_files: List of (circuit_num, circuit_path) tuples
     Returns:
-        dict: {circuit_num: leaf_nodes_list} 每个circuit的叶子节点列表
+        dict: {circuit_num: leaf_nodes_list} Leaf node list for each circuit
     """
     leaf_nodes_by_circuit = {}
     
     for circuit_num, circuit_path in circuit_files:
         try:
-            print(f"\n调查Circuit{circuit_num}的叶子节点...")
+            print(f"\nInvestigating leaf nodes of Circuit{circuit_num}...")
             
-            # 直接加载JSON数据，不依赖Circuit类
+            # Load JSON data directly, without relying on Circuit class
             with open(circuit_path, 'r') as f:
                 data = json.load(f)
             
-            # 收集所有to_node和from_node
+            # Collect all to_nodes and from_nodes
             to_nodes = set()
             from_nodes = set()
             
@@ -718,17 +642,17 @@ def investigate_leaf_nodes(circuit_files):
                     to_nodes.add(to_node)
                     from_nodes.add(from_node)
             
-            # 叶子节点：仅出现在from_node中，不出现在to_node中
+            # Leaf nodes: appear only in from_node, not in to_node
             leaf_nodes = from_nodes - to_nodes
             leaf_nodes_list = list(leaf_nodes)
             
             leaf_nodes_by_circuit[circuit_num] = leaf_nodes_list
             
-            print(f"  Circuit{circuit_num} 包含 {len(leaf_nodes_list)} 个叶子节点")
-            print(f"  叶子节点列表: {leaf_nodes_list}")
+            print(f"  Circuit{circuit_num} contains {len(leaf_nodes_list)} leaf nodes")
+            print(f"  Leaf node list: {leaf_nodes_list}")
             
         except Exception as e:
-            print(f"调查Circuit{circuit_num}的叶子节点时发生错误：{e}")
+            print(f"Error occurred while investigating leaf nodes of Circuit{circuit_num}: {e}")
             leaf_nodes_by_circuit[circuit_num] = []
     
     return leaf_nodes_by_circuit
@@ -736,17 +660,17 @@ def investigate_leaf_nodes(circuit_files):
 
 def main():
     """
-    主函数：构建circuit类，初始化VALUE1和VALUE0
+    Main function: build circuit class, initialize VALUE1 and VALUE0
     """
-    # 解析命令行参数
+    # Parse command line arguments
     args = parse_args()
     
-    # 构建所有circuit类
+    # Build all circuit classes
     circuits = {}
     circuit_files = []
     
-    # 获取所有有效的circuit文件
-    for i in range(1, 7):  # 检查circuit1到circuit4
+    # Get all valid circuit files
+    for i in range(1, 7):  # Check circuit1 to circuit6
         circuit_attr = f"circuit{i}"
         if hasattr(args, circuit_attr):
             circuit_path = getattr(args, circuit_attr)
@@ -754,61 +678,61 @@ def main():
                 circuit_files.append((i, circuit_path))
     
     if not circuit_files:
-        print("错误：没有找到有效的circuit文件！")
+        print("Error: No valid circuit files found!")
         return
     
-    print(f"找到 {len(circuit_files)} 个circuit文件")
+    print(f"Found {len(circuit_files)} circuit files")
     
-    # 调查叶子节点
-    print("\n开始调查叶子节点...")
+    # Investigate leaf nodes
+    print("\nStarting leaf node investigation...")
     leaf_nodes_by_circuit = investigate_leaf_nodes(circuit_files)
     
-    # 构建circuit类并设置NOR参数
+    # Build circuit class and set NOR parameters
     for circuit_num, circuit_path in circuit_files:
         try:
-            print(f"\n构建Circuit{circuit_num}...")
+            print(f"\nBuilding Circuit{circuit_num}...")
             
-            # 获取该circuit的叶子节点
+            # Get leaf nodes for this circuit
             leaf_nodes = leaf_nodes_by_circuit.get(circuit_num, [])
-            print(f"  使用 {len(leaf_nodes)} 个叶子节点进行拓扑排序")
+            print(f"  Using {len(leaf_nodes)} leaf nodes for topological sorting")
             
-            # 创建Circuit实例，传入叶子节点
+            # Create Circuit instance, pass leaf nodes
             circuit = Circuit(circuit_path, leaf_nodes)
             
-            # 设置NOR参数：circuit1为True，其他为False
+            # Set NOR parameter: True for circuit1, False for others
             if circuit_num == 1:
                 circuit.NOR = True
-                print(f"  Circuit{circuit_num} 设置 NOR=True")
+                print(f"  Circuit{circuit_num} set NOR=True")
             else:
                 circuit.NOR = False
-                print(f"  Circuit{circuit_num} 设置 NOR=False")
+                print(f"  Circuit{circuit_num} set NOR=False")
             
             circuits[circuit_num] = circuit
-            print(f"  Circuit{circuit_num} 构建成功，包含 {len(circuit.circuit)} 个to_node")
+            print(f"  Circuit{circuit_num} built successfully, contains {len(circuit.circuit)} to_nodes")
             
         except Exception as e:
-            print(f"构建Circuit{circuit_num}时发生错误：{e}")
+            print(f"Error occurred while building Circuit{circuit_num}: {e}")
             continue
     
     if not circuits:
-        print("错误：没有成功构建任何circuit！")
+        print("Error: No circuits built successfully!")
         return
     
-    print(f"\n成功构建 {len(circuits)} 个circuit")
+    print(f"\nSuccessfully built {len(circuits)} circuits")
     
-    # 初始化VALUE_retain、VALUE_forget、input_retain和input_forget
-    print("\n开始初始化VALUE_retain、VALUE_forget、input_retain和input_forget...")
+    # Initialize VALUE_retain, VALUE_forget, input_retain and input_forget
+    print("\nStarting initialization of VALUE_retain, VALUE_forget, input_retain and input_forget...")
     VALUE_retain, VALUE_forget, input_retain, input_forget = initialize_values(args, leaf_nodes_by_circuit)
     
-    print(f"\n初始化完成：")
-    print(f"VALUE_retain（保留节点）：{len(VALUE_retain)} 个")
-    print(f"VALUE_forget（遗忘节点）：{len(VALUE_forget)} 个")
-    print(f"input_retain（输入保留节点）：{len(input_retain)} 个")
-    print(f"input_forget（输入遗忘节点）：{len(input_forget)} 个")
+    print(f"\nInitialization complete:")
+    print(f"VALUE_retain (Retain nodes): {len(VALUE_retain)} nodes")
+    print(f"VALUE_forget (Forget nodes): {len(VALUE_forget)} nodes")
+    print(f"input_retain (Input retain nodes): {len(input_retain)} nodes")
+    print(f"input_forget (Input forget nodes): {len(input_forget)} nodes")
     
     
-    # 检查当前VALUE_forget和VALUE_retain的布尔验证
-    print("\n检查当前赋值的布尔验证...")
+    # Check boolean validation of current VALUE_forget and VALUE_retain assignments
+    print("\nChecking boolean validation of current assignments...")
     initial_validations = {}
     has_validation_failures = False
     
@@ -817,33 +741,33 @@ def main():
         initial_validations[circuit_num] = is_valid
         if not is_valid:
             has_validation_failures = True
-            print(f"  Circuit{circuit_num} 布尔验证失败")
+            print(f"  Circuit{circuit_num} Boolean validation failed")
         else:
-            print(f"  Circuit{circuit_num} 布尔验证通过")
+            print(f"  Circuit{circuit_num} Boolean validation passed")
     
     if has_validation_failures:
-        print("警告：当前赋值布尔验证失败，可能影响枚举算法的效果")
+        print("Warning: Current assignment boolean validation failed, may affect enumeration algorithm effectiveness")
     else:
-        print("✓ 当前赋值布尔验证通过")
+        print("✓ Current assignment boolean validation passed")
     
-    # 调用modify函数修改VALUE_retain, VALUE_forget, input_retain, input_forget
-    print("\n开始调用modify函数...")
+    # Call modify function to modify VALUE_retain, VALUE_forget, input_retain, input_forget
+    print("\nStarting call to modify function...")
     VALUE_retain, VALUE_forget, input_retain, input_forget, uncertain_node_list_retain, uncertain_node_list_forget = modify(
         VALUE_retain, VALUE_forget, input_retain, input_forget, circuits
     )
     
-    print(f"\nmodify函数执行完成：")
-    print(f"修改后VALUE_retain节点数：{len(VALUE_retain)}")
-    print(f"修改后VALUE_forget节点数：{len(VALUE_forget)}")
-    print(f"修改后input_retain节点数：{len(input_retain)}")
-    print(f"修改后input_forget节点数：{len(input_forget)}")
+    print(f"\nmodify function execution completed:")
+    print(f"Modified VALUE_retain node count: {len(VALUE_retain)}")
+    print(f"Modified VALUE_forget node count: {len(VALUE_forget)}")
+    print(f"Modified input_retain node count: {len(input_retain)}")
+    print(f"Modified input_forget node count: {len(input_forget)}")
     
-    # 处理不确定节点的组合验证
-    print("\n开始处理不确定节点的组合验证...")
+    # Process combination validation of uncertain nodes
+    print("\nStarting processing of uncertain node combination validation...")
     import itertools
     import copy
     
-    # 初始化all_result_lists为字典形式
+    # Initialize all_result_lists as a dictionary
     all_result_lists = {
         'circuit1': [],
         'circuit2': [],
@@ -854,33 +778,33 @@ def main():
         'circuit7': []
     }
     
-    # 处理uncertain_node_list_forget的组合
+    # Process combinations for uncertain_node_list_forget
     if uncertain_node_list_forget:
-        print(f"\n处理uncertain_node_list_forget的 {len(uncertain_node_list_forget)} 个节点...")
+        print(f"\nProcessing {len(uncertain_node_list_forget)} nodes in uncertain_node_list_forget...")
         N = len(uncertain_node_list_forget)
         total_combinations = 2 ** N
-        print(f"  共有 {total_combinations} 种组合需要验证")
+        print(f"  Total {total_combinations} combinations to validate")
         
         for i, combination in enumerate(itertools.product([0, 1], repeat=N)):
-            print(f"  验证组合 {i+1}/{total_combinations}: {combination}")
+            print(f"  Validating combination {i+1}/{total_combinations}: {combination}")
             
-            # 创建临时的input_forget副本
+            # Create temporary input_forget copy
             temp_input_forget = copy.deepcopy(input_forget)
             
-            # 将组合值赋给对应的节点
+            # Assign combination values to corresponding nodes
             for j, node in enumerate(uncertain_node_list_forget):
                 for k, (n, v) in enumerate(temp_input_forget):
                     if n == node:
                         temp_input_forget[k][1] = bool(combination[j])
                         break
             
-            # 验证circuit1
+            # Validate circuit1
             if 1 in circuits:
                 circuit1 = circuits[1]
                 is_valid, result_list = circuit1.bool_validation(VALUE_retain, VALUE_forget, input_retain, temp_input_forget)
                 
                 if is_valid:
-                    print(f"    ✓ Circuit1验证通过，保存result_list")
+                    print(f"    ✓ Circuit1 validation passed, saving result_list")
                     all_result_lists['circuit1'].append({
                         'type': 'forget',
                         'combination': combination,
@@ -888,67 +812,67 @@ def main():
                         'result_lists': result_list
                     })
                 else:
-                    print(f"    ✗ Circuit1验证失败")
+                    print(f"    ✗ Circuit1 validation failed")
             else:
-                print(f"    警告：没有找到Circuit1")
+                print(f"    Warning: Circuit1 not found")
     else:
-        print(f"\nuncertain_node_list_forget为空，直接验证原始input_forget...")
-        # 验证circuit1
+        print(f"\nuncertain_node_list_forget is empty, directly validating original input_forget...")
+        
         if 1 in circuits:
             circuit1 = circuits[1]
             is_valid, result_list = circuit1.bool_validation(VALUE_retain, VALUE_forget, input_retain, input_forget)
             
             if is_valid:
-                print(f"  ✓ Circuit1验证通过，保存result_list")
+                print(f"  ✓ Circuit1 validation passed, saving result_list")
                 all_result_lists['circuit1'].append({
                     'type': 'forget',
-                    'combination': (),  # 空组合
-                    'nodes': [],  # 空节点列表
+                    'combination': (),  # Empty combination
+                    'nodes': [],  # Empty node list
                     'result_lists': result_list
                 })
             else:
-                print(f"  ✗ Circuit1验证失败")
+                print(f"  ✗ Circuit1 validation failed")
         else:
-            print(f"  警告：没有找到Circuit1")
+            print(f"  Warning: Circuit1 not found")
     
-    # 处理uncertain_node_list_retain的组合
+    # Process combinations for uncertain_node_list_retain
     if uncertain_node_list_retain:
-        print(f"\n处理uncertain_node_list_retain的 {len(uncertain_node_list_retain)} 个节点...")
+        print(f"\nProcessing {len(uncertain_node_list_retain)} nodes in uncertain_node_list_retain...")
         M = len(uncertain_node_list_retain)
         total_combinations = 2 ** M
-        print(f"  共有 {total_combinations} 种组合需要验证")
+        print(f"  Total {total_combinations} combinations to validate")
         
         for i, combination in enumerate(itertools.product([0, 1], repeat=M)):
-            print(f"  验证组合 {i+1}/{total_combinations}: {combination}")
+            print(f"  Validating combination {i+1}/{total_combinations}: {combination}")
             
-            # 创建临时的input_retain副本
+            # Create temporary input_retain copy
             temp_input_retain = copy.deepcopy(input_retain)
             
-            # 将组合值赋给对应的节点
+            # Assign combination values to corresponding nodes
             for j, node in enumerate(uncertain_node_list_retain):
                 for k, (n, v) in enumerate(temp_input_retain):
                     if n == node:
                         temp_input_retain[k][1] = bool(combination[j])
                         break
             
-            # 验证除了circuit1以外的其他circuit
+            # Validate other circuits except circuit1
             all_other_circuits_valid = True
             result_lists = {}
             
             for circuit_num, circuit in circuits.items():
-                if circuit_num != 1:  # 跳过circuit1
+                if circuit_num != 1:  # Skip circuit1
                     is_valid, result_list = circuit.bool_validation(VALUE_retain, VALUE_forget, temp_input_retain, input_forget)
                     
                     if is_valid:
                         result_lists[circuit_num] = result_list
                     else:
                         all_other_circuits_valid = False
-                        print(f"    ✗ Circuit{circuit_num}验证失败")
+                        print(f"    ✗ Circuit{circuit_num} validation failed")
                         break
             
             if all_other_circuits_valid:
-                print(f"    ✓ 所有其他circuit验证通过，保存result_lists")
-                # 将结果分别保存到对应的circuit中
+                print(f"    ✓ All other circuits validation passed, saving result_lists")
+                # Save results to corresponding circuits
                 for circuit_num, result_list in result_lists.items():
                     circuit_key = f'circuit{circuit_num}'
                     all_result_lists[circuit_key].append({
@@ -958,60 +882,60 @@ def main():
                         'result_lists': result_list
                     })
     else:
-        print(f"\nuncertain_node_list_retain为空，直接验证原始input_retain...")
-        # 验证除了circuit1以外的其他circuit
+        print(f"\nuncertain_node_list_retain is empty, directly validating original input_retain...")
+        # Validate other circuits except circuit1
         all_other_circuits_valid = True
         result_lists = {}
         
         for circuit_num, circuit in circuits.items():
-            if circuit_num != 1:  # 跳过circuit1
+            if circuit_num != 1:  # Skip circuit1
                 is_valid, result_list = circuit.bool_validation(VALUE_retain, VALUE_forget, input_retain, input_forget)
                 
                 if is_valid:
                     result_lists[circuit_num] = result_list
                 else:
                     all_other_circuits_valid = False
-                    print(f"  ✗ Circuit{circuit_num}验证失败")
+                    print(f"  ✗ Circuit{circuit_num} validation failed")
                     break
         
         if all_other_circuits_valid:
-            print(f"  ✓ 所有其他circuit验证通过，保存result_lists")
-            # 将结果分别保存到对应的circuit中
+            print(f"  ✓ All other circuits validation passed, saving result_lists")
+            # Save results to corresponding circuits
             for circuit_num, result_list in result_lists.items():
                 circuit_key = f'circuit{circuit_num}'
                 all_result_lists[circuit_key].append({
                     'type': 'retain',
-                    'combination': (),  # 空组合
-                    'nodes': [],  # 空节点列表
+                    'combination': (),  # Empty combination
+                    'nodes': [],  # Empty node list
                     'result_lists': result_list
                 })
     
-    print(f"\n组合验证完成，各circuit的有效组合数量:")
+    print(f"\nCombination validation completed, valid combination count for each circuit:")
     total_combinations = 0
     for circuit_key, combinations in all_result_lists.items():
-        print(f"  {circuit_key}: {len(combinations)} 个有效组合")
+        print(f"  {circuit_key}: {len(combinations)} valid combinations")
         total_combinations += len(combinations)
-    print(f"  总计: {total_combinations} 个有效组合")
+    print(f"  Total: {total_combinations} valid combinations")
     
-    # 生成forget_all_node和retain_all_node
-    print(f"\n开始生成forget_all_node和retain_all_node...")
+    # Generate forget_all_node and retain_all_node
+    print(f"\nStarting generation of forget_all_node and retain_all_node...")
     
     def merge_result_lists(result_lists_dict):
         """
-        合并多个circuit的result_lists
+        Merge result_lists from multiple circuits
         Args:
-            result_lists_dict: {circuit_num: result_list} 字典
+            result_lists_dict: {circuit_num: result_list} dictionary
         Returns:
-            dict: 合并后的result_list
+            dict: Merged result_list
         """
         merged_result = {}
         all_nodes = set()
         
-        # 收集所有节点
+        # Collect all nodes
         for result_list in result_lists_dict.values():
             all_nodes.update(result_list.keys())
         
-        # 对每个节点进行合并
+        # Merge each node
         for node in all_nodes:
             values = []
             for circuit_num, result_list in result_lists_dict.items():
@@ -1020,42 +944,42 @@ def main():
                 else:
                     values.append(None)
             
-            # 检查值的有效性
+            # Check value validity
             non_none_values = [v for v in values if v is not None]
             
             if len(non_none_values) == 0:
-                # 所有值都是None，报错
-                raise ValueError(f"节点 {node} 在所有circuit中的值都是None")
+                # All values are None, error
+                raise ValueError(f"Node {node} has None values in all circuits")
             
             if len(non_none_values) < len(values):
-                # 有None值也有bool值，检查bool值是否相同
+                # Has None values and bool values, check if bool values are the same
                 unique_values = set(non_none_values)
                 if len(unique_values) > 1:
-                    raise ValueError(f"节点 {node} 在不同circuit中的值不一致: {values}")
+                    raise ValueError(f"Node {node} has inconsistent values across circuits: {values}")
                 
-                # 所有非None值都相同，取这个值
+                # All non-None values are the same, take this value
                 merged_result[node] = non_none_values[0]
             else:
-                # 所有值都不是None，检查是否相同
+                # All values are not None, check if they are the same
                 unique_values = set(values)
                 if len(unique_values) > 1:
-                    raise ValueError(f"节点 {node} 在不同circuit中的值不一致: {values}")
+                    raise ValueError(f"Node {node} has inconsistent values across circuits: {values}")
                 
                 merged_result[node] = values[0]
         
         return merged_result
     
-    # 生成forget_all_node（circuit1的所有组合）
+    # Generate forget_all_node (all combinations for circuit1)
     forget_all_node = []
     for combo in all_result_lists['circuit1']:
         forget_all_node.append(combo['result_lists'])
     
-    print(f"  forget_all_node: {len(forget_all_node)} 个组合")
+    print(f"  forget_all_node: {len(forget_all_node)} combinations")
     
-    # 生成retain_all_node（其他circuit的组合合并）
+    # Generate retain_all_node (merge combinations from other circuits)
     retain_all_node = []
     
-    # 获取其他circuit的组合
+    # Get combinations from other circuits
     other_circuit_combinations = {}
     for circuit_key, combinations in all_result_lists.items():
         if circuit_key != 'circuit1':
@@ -1063,79 +987,79 @@ def main():
             other_circuit_combinations[circuit_num] = combinations
     
     if other_circuit_combinations:
-        # 过滤掉没有有效组合的circuit
+        # Filter out circuits without valid combinations
         valid_circuit_combinations = {}
         for circuit_num, combinations in other_circuit_combinations.items():
             if len(combinations) > 0:
                 valid_circuit_combinations[circuit_num] = combinations
         
         if valid_circuit_combinations:
-            # 获取所有可能的组合索引
+            # Get all possible combination indices
             circuit_nums = sorted(valid_circuit_combinations.keys())
             combination_counts = [len(valid_circuit_combinations[circuit_num]) for circuit_num in circuit_nums]
             
-            print(f"    有效circuit: {circuit_nums}")
-            print(f"    各circuit组合数: {combination_counts}")
+            print(f"    Valid circuits: {circuit_nums}")
+            print(f"    Combination counts per circuit: {combination_counts}")
             
-            # 生成所有可能的组合
+            # Generate all possible combinations
             for combo_indices in itertools.product(*[range(count) for count in combination_counts]):
                 try:
-                    # 收集这个组合的所有result_lists
+                    # Collect all result_lists for this combination
                     result_lists_dict = {}
                     for i, circuit_num in enumerate(circuit_nums):
                         combo_idx = combo_indices[i]
                         if combo_idx < len(valid_circuit_combinations[circuit_num]):
                             result_lists_dict[circuit_num] = valid_circuit_combinations[circuit_num][combo_idx]['result_lists']
                     
-                    # 合并result_lists
+                    # Merge result_lists
                     merged_result = merge_result_lists(result_lists_dict)
                     retain_all_node.append(merged_result)
                     
                 except ValueError as e:
-                    print(f"    跳过无效组合 {combo_indices}: {e}")
+                    print(f"    Skipping invalid combination {combo_indices}: {e}")
                     continue
         else:
-            print("    警告：没有找到有效的其他circuit组合")
+            print("    Warning: No valid other circuit combinations found")
     else:
-        print("    警告：没有找到其他circuit的组合")
+        print("    Warning: No other circuit combinations found")
     
-    print(f"  retain_all_node: {len(retain_all_node)} 个组合")
+    print(f"  retain_all_node: {len(retain_all_node)} combinations")
     
-    # 检查是否有足够的组合进行比较
+    # Check if there are enough combinations for comparison
     if len(forget_all_node) == 0:
-        print("错误：forget_all_node为空，无法进行比较")
+        print("Error: forget_all_node is empty, cannot perform comparison")
         return circuits, VALUE_retain, VALUE_forget, input_retain, input_forget, leaf_nodes_by_circuit, all_result_lists, [], [], None, None, [], [], []
     
     if len(retain_all_node) == 0:
-        print("错误：retain_all_node为空，无法进行比较")
+        print("Error: retain_all_node is empty, cannot perform comparison")
         return circuits, VALUE_retain, VALUE_forget, input_retain, input_forget, leaf_nodes_by_circuit, all_result_lists, forget_all_node, [], None, None, [], [], []
     
-    # 计算汉明距离
-    print(f"\n开始计算forget_all_node和retain_all_node之间的汉明距离...")
+    # Calculate Hamming distance
+    print(f"\nStarting calculation of Hamming distance between forget_all_node and retain_all_node...")
     
     def calculate_hamming_distance(result_list1, result_list2):
         """
-        计算两个result_list之间的汉明距离
+        Calculate Hamming distance between two result_lists
         Args:
-            result_list1: 第一个result_list (字典形式)
-            result_list2: 第二个result_list (字典形式)
+            result_list1: First result_list (dictionary format)
+            result_list2: Second result_list (dictionary format)
         Returns:
-            int: 汉明距离
+            int: Hamming distance
         """
-        # 找出两个result_list中同时存在的node
+        # Find nodes that exist in both result_lists
         nodes1 = set(result_list1.keys())
         nodes2 = set(result_list2.keys())
         common_nodes = nodes1.intersection(nodes2)
         
         hamming_distance = 0
         for node in common_nodes:
-            # 如果value不同则计1分
+            # If values are different, add 1 point
             if result_list1[node] != result_list2[node]:
                 hamming_distance += 1
         
         return hamming_distance
     
-    # 计算所有forget和retain组合之间的汉明距离
+    # Calculate Hamming distance between all forget and retain combinations
     hamming_distances = {}
     best_forget_idx = None
     best_retain_idx = None
@@ -1151,34 +1075,34 @@ def main():
                 best_forget_idx = forget_idx
                 best_retain_idx = retain_idx
             
-            print(f"  forget[{forget_idx}] vs retain[{retain_idx}]: 汉明距离 = {distance}")
+            print(f"  forget[{forget_idx}] vs retain[{retain_idx}]: Hamming distance = {distance}")
     
-    print(f"\n=== 汉明距离分析结果 ===")
-    print(f"最佳组合: forget[{best_forget_idx}] vs retain[{best_retain_idx}]")
-    print(f"最小汉明距离: {min_distance}")
+    print(f"\n=== Hamming Distance Analysis Results ===")
+    print(f"Best combination: forget[{best_forget_idx}] vs retain[{best_retain_idx}]")
+    print(f"Minimum Hamming distance: {min_distance}")
     
-    # 检查是否找到了最佳组合
+    # Check if best combination was found
     if best_forget_idx is None or best_retain_idx is None:
-        print("错误：未能找到最佳组合")
+        print("Error: Could not find best combination")
         return circuits, VALUE_retain, VALUE_forget, input_retain, input_forget, leaf_nodes_by_circuit, all_result_lists, forget_all_node, retain_all_node, None, None, [], [], []
     
-    # 分析最佳组合的节点
-    print(f"\n开始分析最佳组合的节点...")
+    # Analyze nodes of best combination
+    print(f"\nStarting analysis of best combination nodes...")
     
     best_forget_result = forget_all_node[best_forget_idx]
     best_retain_result = retain_all_node[best_retain_idx]
     
-    # 生成两个节点集
+    # Generate two node sets
     forget_nodes = set(best_forget_result.keys())
     retain_nodes = set(best_retain_result.keys())
     
     common_nodes = forget_nodes.intersection(retain_nodes)
     non_common_nodes = forget_nodes.symmetric_difference(retain_nodes)
     
-    print(f"  共同存在的节点: {len(common_nodes)} 个")
-    print(f"  不共同存在的节点: {len(non_common_nodes)} 个")
+    print(f"  Common nodes: {len(common_nodes)} nodes")
+    print(f"  Non-common nodes: {len(non_common_nodes)} nodes")
     
-    # 分析共同存在的节点
+    # Analyze common nodes
     conflict_node_list = []
     same_value_nodes = []
     
@@ -1188,10 +1112,10 @@ def main():
         else:
             same_value_nodes.append(node)
     
-    # 将取值相同的节点加入到不共同存在的节点集中
+    # Add nodes with same values to non-common nodes set
     non_common_nodes.update(same_value_nodes)
     
-    # 分析不共同存在的节点
+    # Analyze non-common nodes
     false_node_list = []
     true_node_list = []
     
@@ -1206,55 +1130,55 @@ def main():
         elif value is True:
             true_node_list.append(node)
     
-    # 确保三个list中没有重复的node
+    # Ensure no duplicate nodes in the three lists
     conflict_set = set(conflict_node_list)
     false_set = set(false_node_list)
     true_set = set(true_node_list)
     
-    # 检查是否有重复
+    # Check for duplicates
     all_nodes = conflict_set.union(false_set).union(true_set)
     if len(all_nodes) != len(conflict_node_list) + len(false_node_list) + len(true_node_list):
-        print("  警告：三个list中存在重复的node，正在去重...")
+        print("  Warning: Duplicate nodes found in the three lists, deduplicating...")
         conflict_node_list = list(conflict_set)
         false_node_list = list(false_set)
         true_node_list = list(true_set)
     
-    print(f"\n=== 节点分析结果 ===")
-    print(f"conflict_node_list: {len(conflict_node_list)} 个节点")
+    print(f"\n=== Node Analysis Results ===")
+    print(f"conflict_node_list: {len(conflict_node_list)} nodes")
     if conflict_node_list:
-        print(f"  节点列表: {conflict_node_list}")
+        print(f"  Node list: {conflict_node_list}")
     
-    print(f"false_node_list: {len(false_node_list)} 个节点")
+    print(f"false_node_list: {len(false_node_list)} nodes")
     if false_node_list:
-        print(f"  节点列表: {false_node_list}")
+        print(f"  Node list: {false_node_list}")
     
-    print(f"true_node_list: {len(true_node_list)} 个节点")
+    print(f"true_node_list: {len(true_node_list)} nodes")
     if true_node_list:
-        print(f"  节点列表: {true_node_list}")
+        print(f"  Node list: {true_node_list}")
     
-    # 保存结果到JSON文件
-    print(f"\n开始保存结果到JSON文件...")
+    # Save results to JSON files
+    print(f"\nStarting to save results to JSON files...")
     
     def extract_circuit_name(circuit_path):
         """
-        从circuit路径中提取circuit名称
+        Extract circuit name from circuit path
         Args:
-            circuit_path: circuit文件的完整路径
+            circuit_path: Complete path of circuit file
         Returns:
-            str: 提取的circuit名称
+            str: Extracted circuit name
         """
-        # 分割路径
+        # Split path
         parts = circuit_path.split('/')
-        # 找到包含circuit名称的部分
+        # Find part containing circuit name
         for part in parts:
             if '_edges' in part:
-                # 提取下划线前的部分
+                # Extract part before underscore
                 return part.split('_')[0]
         return "unknown"
     
-    # 获取所有circuit的名称
+    # Get names of all circuits
     circuit_names = []
-    for i in range(1, 7):  # circuit1到circuit4
+    for i in range(1, 7):  # circuit1 to circuit4
         circuit_attr = f"circuit{i}"
         if hasattr(args, circuit_attr):
             circuit_path = getattr(args, circuit_attr)
@@ -1262,95 +1186,95 @@ def main():
                 circuit_name = extract_circuit_name(circuit_path)
                 circuit_names.append(circuit_name)
     
-    # 生成文件名后缀
+    # Generate filename suffix
     suffix = "_".join(circuit_names)
     
-    # 保存目录
-    save_dir = "/home/lthpc/hangc/CSAT/Edge-Pruning/data/masks/"
+    # Save directory
+    save_dir = ""
     os.makedirs(save_dir, exist_ok=True)
     
-    # 保存conflict_node_list
+    # Save conflict_node_list
     conflict_file = os.path.join(save_dir, f"conflict_node_list_{suffix}.json")
     with open(conflict_file, 'w') as f:
         json.dump(conflict_node_list, f, indent=2)
-    print(f"  保存conflict_node_list到: {conflict_file}")
+    print(f"  Saved conflict_node_list to: {conflict_file}")
     
-    # 保存false_node_list
+    # Save false_node_list
     false_file = os.path.join(save_dir, f"false_node_list_{suffix}.json")
     with open(false_file, 'w') as f:
         json.dump(false_node_list, f, indent=2)
-    print(f"  保存false_node_list到: {false_file}")
+    print(f"  Saved false_node_list to: {false_file}")
     
-    # 保存true_node_list
+    # Save true_node_list
     true_file = os.path.join(save_dir, f"true_node_list_{suffix}.json")
     with open(true_file, 'w') as f:
         json.dump(true_node_list, f, indent=2)
-    print(f"  保存true_node_list到: {true_file}")
+    print(f"  Saved true_node_list to: {true_file}")
     
-    print(f"所有结果已保存到: {save_dir}")
+    print(f"All results saved to: {save_dir}")
     
     return circuits, VALUE_retain, VALUE_forget, input_retain, input_forget, leaf_nodes_by_circuit, all_result_lists, forget_all_node, retain_all_node, best_forget_idx, best_retain_idx, conflict_node_list, false_node_list, true_node_list
 
 if __name__ == "__main__":
-    # 运行主函数
+    # Run main function
     circuits, VALUE_retain, VALUE_forget, input_retain, input_forget, leaf_nodes_by_circuit, all_result_lists, forget_all_node, retain_all_node, best_forget_idx, best_retain_idx, conflict_node_list, false_node_list, true_node_list = main()
     
-    # 打印叶子节点调查结果
-    print(f"\n=== 叶子节点调查结果 ===")
+    # Print leaf node investigation results
+    print(f"\n=== Leaf Node Investigation Results ===")
     for circuit_num, leaf_nodes in leaf_nodes_by_circuit.items():
-        print(f"Circuit{circuit_num}: {len(leaf_nodes)} 个叶子节点")
+        print(f"Circuit{circuit_num}: {len(leaf_nodes)} leaf nodes")
         if leaf_nodes:
-            print(f"  叶子节点: {leaf_nodes}")
+            print(f"  Leaf nodes: {leaf_nodes}")
         print()
     
-    # 打印输入节点信息
-    print(f"\n=== 输入节点信息 ===")
-    print(f"input_retain: {len(input_retain)} 个节点")
+    # Print input node information
+    print(f"\n=== Input Node Information ===")
+    print(f"input_retain: {len(input_retain)} nodes")
     if input_retain:
-        print(f"  节点列表: {input_retain}")
-    print(f"input_forget: {len(input_forget)} 个节点")
+        print(f"  Node list: {input_retain}")
+    print(f"input_forget: {len(input_forget)} nodes")
     if input_forget:
-        print(f"  节点列表: {input_forget}")
+        print(f"  Node list: {input_forget}")
     print()
     
-    # 打印组合验证结果
-    print(f"\n=== 组合验证结果 ===")
+    # Print combination validation results
+    print(f"\n=== Combination Validation Results ===")
     total_combinations = sum(len(combinations) for combinations in all_result_lists.values())
-    print(f"共找到 {total_combinations} 个有效组合")
+    print(f"Found {total_combinations} valid combinations")
     
     for circuit_key, combinations in all_result_lists.items():
         if combinations:
-            print(f"\n{circuit_key}: {len(combinations)} 个有效组合")
+            print(f"\n{circuit_key}: {len(combinations)} valid combinations")
             for i, result_info in enumerate(combinations):
-                print(f"  组合 {i+1}:")
-                print(f"    类型: {result_info['type']}")
-                print(f"    节点组合: {result_info['combination']}")
-                print(f"    对应节点: {result_info['nodes']}")
-                print(f"    result_lists长度: {len(result_info['result_lists'])}")
-                print(f"    result_lists前10项: {list(result_info['result_lists'].items())[:10]}")
+                print(f"  Combination {i+1}:")
+                print(f"    Type: {result_info['type']}")
+                print(f"    Node combination: {result_info['combination']}")
+                print(f"    Corresponding nodes: {result_info['nodes']}")
+                print(f"    result_lists length: {len(result_info['result_lists'])}")
+                print(f"    result_lists first 10 items: {list(result_info['result_lists'].items())[:10]}")
     print()
     
-    # 打印汉明距离分析结果
-    print(f"\n=== 汉明距离分析结果 ===")
+    # Print Hamming distance analysis results
+    print(f"\n=== Hamming Distance Analysis Results ===")
     if best_forget_idx is not None and best_retain_idx is not None:
-        print(f"最佳组合: forget[{best_forget_idx}] vs retain[{best_retain_idx}]")
+        print(f"Best combination: forget[{best_forget_idx}] vs retain[{best_retain_idx}]")
     else:
-        print("未能找到最佳组合")
+        print("Could not find best combination")
     
-    print(f"\nforget_all_node: {len(forget_all_node)} 个组合")
-    print(f"retain_all_node: {len(retain_all_node)} 个组合")
+    print(f"\nforget_all_node: {len(forget_all_node)} combinations")
+    print(f"retain_all_node: {len(retain_all_node)} combinations")
     
-    print(f"\n=== 节点分析结果 ===")
-    print(f"conflict_node_list: {len(conflict_node_list)} 个节点")
+    print(f"\n=== Node Analysis Results ===")
+    print(f"conflict_node_list: {len(conflict_node_list)} nodes")
     if conflict_node_list:
-        print(f"  节点列表: {conflict_node_list}")
+        print(f"  Node list: {conflict_node_list}")
     
-    print(f"false_node_list: {len(false_node_list)} 个节点")
+    print(f"false_node_list: {len(false_node_list)} nodes")
     if false_node_list:
-        print(f"  节点列表: {false_node_list}")
+        print(f"  Node list: {false_node_list}")
     
-    print(f"true_node_list: {len(true_node_list)} 个节点")
+    print(f"true_node_list: {len(true_node_list)} nodes")
     if true_node_list:
-        print(f"  节点列表: {true_node_list}")
+        print(f"  Node list: {true_node_list}")
     print()
 

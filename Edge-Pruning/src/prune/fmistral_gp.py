@@ -26,8 +26,8 @@ import json
 import warnings
 from dataclasses import dataclass, field
 from typing import Optional
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
-# 禁用wandb
+
+# Disable wandb
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["WANDB_MODE"] = "disabled"
 os.environ["WANDB_DISABLE_GPU_STATS"] = "true"
@@ -507,10 +507,10 @@ def main():
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
-    # 获取脚本所在目录的上级目录（Edge-Pruning目录）
+    # Get parent directory of script directory (Edge-Pruning directory)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    edge_pruning_dir = os.path.dirname(script_dir)  # 从 src/prune 到 src
-    edge_pruning_dir = os.path.dirname(edge_pruning_dir)  # 从 src 到 Edge-Pruning
+    edge_pruning_dir = os.path.dirname(script_dir)  # From src/prune to src
+    edge_pruning_dir = os.path.dirname(edge_pruning_dir)  # From src to Edge-Pruning
     config_path = os.path.join(edge_pruning_dir, 'config.json')
     sys.argv = [os.path.abspath(__file__), config_path]
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -575,33 +575,33 @@ def main():
     raw_datasets = load_datasets(data_args.dataset_path, data_args.max_train_samples, data_args.max_eval_samples, train_split=data_args.train_split)
     n_train = len(raw_datasets["train"])
     
-    # 自动分配模型到多个GPU
-    device_map = "auto"  # 或者使用 "balanced" 来平衡分配
+    # Automatically distribute model to multiple GPUs
+    device_map = "auto"  # Or use "balanced" for balanced distribution
     
     model = FMistralForCausalLM.from_pretrained(
         model_args.initialize_from,
         with_embedding_nodes=True,
         disable_linear_regularization_term=data_args.disable_linear_reg_term,
         device_map=device_map,
-        torch_dtype=torch.float32,  # 使用float32避免半精度问题
-        offload_folder="./offload",  # 设置模型卸载目录
+        torch_dtype=torch.float32,  # Use float32 to avoid half precision issues
+        offload_folder="./offload",  # Set model offload directory
     )
     mistral_model = FMistralForCausalLM.from_pretrained(
         "HuggingFaceH4/zephyr-7b-beta",
         with_embedding_nodes=True,
-        cache_dir='/data/zodiark/CSAT/.cache',
+        cache_dir='',
         device_map=device_map,
-        torch_dtype=torch.float32,  # 使用float32避免半精度问题
-        offload_folder="./offload",  # 设置模型卸载目录
+        torch_dtype=torch.float32,  # Use float32 to avoid half precision issues
+        offload_folder="./offload",  # Set model offload directory
     )
     
-    # 冻结mistral_model的所有参数
+    # Freeze all parameters of mistral_model
     for param in mistral_model.parameters():
         param.requires_grad = False
     
-    # 验证mistral_model参数冻结状态
+    # Verify mistral_model parameter freeze status
     mistral_trainable_params = sum(p.numel() for p in mistral_model.parameters() if p.requires_grad)
-    print(f"mistral_model的所有参数已冻结，可训练参数数量: {mistral_trainable_params}")
+    print(f"All parameters of mistral_model have been frozen, trainable parameter count: {mistral_trainable_params}")
     
     tokenizer = AutoTokenizer.from_pretrained("HuggingFaceH4/zephyr-7b-beta")
     tokenizer.pad_token = tokenizer.eos_token

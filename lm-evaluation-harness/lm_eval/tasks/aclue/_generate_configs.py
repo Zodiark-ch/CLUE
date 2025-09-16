@@ -14,10 +14,10 @@ eval_logger = logging.getLogger(__name__)
 
 
 SUBJECTS = {
-    "古文单字多义": "polysemy_resolution",
-    "诗词情感分类": "poetry_sentiment_analysis",
-    "古汉语命名体识别": "named_entity_recognition",
-    "古汉语知识": "basic_ancient_chinese",
+    "Ancient Chinese polysemy": "polysemy_resolution",
+    "Poetry sentiment classification": "poetry_sentiment_analysis",
+    "Ancient Chinese NER": "named_entity_recognition",
+    "Ancient Chinese knowledge": "basic_ancient_chinese",
     "古诗词上下句预测": "poetry_context_prediction",
     "古文断句": "sentence_segmentation",
     "对联": "couplet_prediction",

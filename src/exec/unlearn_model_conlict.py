@@ -12,17 +12,17 @@ from fastargs.decorators import param
 from fastargs.validation import BoolAsInt, File, Folder, OneOf
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 Section("overall", "Overall configs").params(
     model_name=Param(str, required=True, default="HuggingFaceH4/zephyr-7b-beta", desc="Model name"),
     logger=Param(OneOf(["json", "none"]), default="json", desc="Logger to use"),
-    cache_dir=Param(Folder(True), default="/data/zodiark/CSAT/.cache", desc="Cache directory"),
+    cache_dir=Param(Folder(True), default="", desc="Cache directory"),
     seed=Param(int, default=0, desc="Random seed"),
 )
 
 
 Section("unlearn", "Unlearning configs").params(
-    # 冲突学习参数
+    # Conflict learning parameters
     safe_unlearn_method=Param(
         OneOf(
             [
@@ -64,10 +64,10 @@ Section("unlearn", "Unlearning configs").params(
         default="CL+FT",
         desc="Conflict unlearning method",
     ),
-    safe_mask_path=Param(str, default="/data/zodiark/CSAT/conflict/safe_mask.pt", desc="Path to safe mask file"),
-    #/data/zodiark/CSAT/conflict/safe_mask.pt     /data/zodiark/CSAT/conflict/conflict_mask.pt
-    conflict_mask_path=Param(str, default="/data/zodiark/CSAT/conflict/conflict_mask.pt", desc="Path to conflict mask file"),
-    #/data/zodiark/CSAT/wanda/zephyr/with_0.9.pt
+    safe_mask_path=Param(str, default="", desc="Path to safe mask file"),
+    
+    conflict_mask_path=Param(str, default="", desc="Path to conflict mask file"),
+    
     alternate_frequency=Param(int, default=1, desc="Alternate frequency (epochs per switch)"),
     
     num_epochs=Param(int, default=6, desc="Number of epochs to train"),
@@ -76,7 +76,7 @@ Section("unlearn", "Unlearning configs").params(
     gradient_accumulation_steps=Param(
         int, default=4, desc="Gradient accumulation steps"
     ),
-    max_grad_norm=Param(float, default=1.0, desc="Maximum gradient norm for clipping"),  # 添加梯度裁剪参数
+    max_grad_norm=Param(float, default=1.0, desc="Maximum gradient norm for clipping"),  # Add gradient clipping parameter
     task_name=Param(
         OneOf(["toxic", "copyright", "tofu", "wmdp","downstream"]),
         default="downstream",
@@ -163,7 +163,7 @@ Section("logger", "General logger configs").params(
 Section("logger.json", "JSON logger").enable_if(
     lambda cfg: cfg["overall.logger"] == "json"
 ).params(
-    root=Param(Folder(True), default="/data/zodiark/CSAT/files/logs", desc="Path to log folder"),
+    root=Param(Folder(True), default="", desc="Path to log folder"),
 )
 
 
@@ -179,12 +179,12 @@ class Main:
     def make_config(self, quiet=False):
         self.config = get_current_config()
         parser = argparse.ArgumentParser("LLM unlearning")
-        self.config.augment_argparse(parser)#可以直接导入config文件进行配置
-        self.config.collect_argparse_args(parser)#将多个config.json和命令行参数进行合并整合成一个config，优先级最高的是命令行参数>config>环境变量>default值
+        self.config.augment_argparse(parser)# Can directly import config file for configuration
+        self.config.collect_argparse_args(parser)# Merge multiple config.json and command line arguments into one config, priority is command line args > config > environment variables > default values
 
-        self.config.validate()#遍历所有参数触发类型检查和必填项检查
+        self.config.validate()# Traverse all parameters to trigger type checking and required field checking
         if not quiet:
-            self.config.summary()#以表格的形式print出所有参数
+            self.config.summary()# Print all parameters in table format
 
     @param("overall.seed")
     def setup_seed(self, seed: int):
@@ -203,34 +203,34 @@ class Main:
         kwargs.update(self.config.get_section(f"unlearn"))
         kwargs.update(self.config.get_section(f"dataset"))
         
-        # 处理冲突学习的参数
+        # Handle conflict learning parameters
         kwargs.update(self.config.get_section(f"unlearn.{kwargs['safe_unlearn_method']}"))
         kwargs.update(self.config.get_section(f"unlearn.{kwargs['conflict_unlearn_method']}"))
             
         if kwargs["sophia"]:
             kwargs.update(self.config.get_section(f"unlearn.sophia_params"))
         
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_dataset_name = kwargs["retain_dataset_name"]
         if "," in retain_dataset_name:
-            # 多个数据集，按逗号分割并去除空格
+            # Multiple datasets, split by comma and remove spaces
             retain_datasets = [ds.strip() for ds in retain_dataset_name.split(",")]
             kwargs["dataset_names"] = {
                 "forget": kwargs["forget_dataset_name"],
                 "retain": retain_datasets,
             }
         else:
-            # 单个数据集，保持原有行为
+            # Single dataset, maintain original behavior
             kwargs["dataset_names"] = {
                 "forget": kwargs["forget_dataset_name"],
                 "retain": kwargs["retain_dataset_name"],
             }
         
-        # 使用冲突学习模块
+        # Use conflict learning module
         self.model = import_module(f"model.unlearn_conflict").get(**kwargs)
 
     @param("overall.logger")
-    def init_logger(self, logger):#这个logger的值是通过@param("overall.logger")传入的
+    def init_logger(self, logger):# This logger value is passed through @param("overall.logger")
         kwargs = self.config.get_section(f"logger")
         kwargs.update(self.config.get_section(f"logger.{logger}"))
         kwargs["config"] = self.config.get_all_config()

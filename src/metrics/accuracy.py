@@ -13,16 +13,16 @@ def eval_acc(
     device="cuda"
 ):
     """
-    评估模型在retain数据集上的准确率
+    Evaluate model accuracy on retain dataset
     
     Args:
-        model_name: 模型名称
-        retain_dataset: 测试数据集
-        output_dir: 输出目录
-        batch_size: 批次大小
-        device: 设备
+        model_name: Model name
+        retain_dataset: Test dataset
+        output_dir: Output directory
+        batch_size: Batch size
+        device: Device
     """
-    # 加载模型和tokenizer
+    # Load model and tokenizer
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
@@ -33,7 +33,7 @@ def eval_acc(
     
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
     
-    # 设置pad token
+    # Set pad token
     try:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -41,7 +41,7 @@ def eval_acc(
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-    # 创建数据加载器
+    # Create data loader
     dataloader = DataLoader(
         retain_dataset, 
         batch_size=batch_size, 
@@ -57,48 +57,48 @@ def eval_acc(
     correct_predictions = 0
     total_predictions = 0
     
-    print("开始评估准确率...")
+    print("Starting accuracy evaluation...")
     
     with torch.no_grad():
-        for batch in tqdm.tqdm(dataloader, desc="评估进度"):
-            # 将数据移到设备上
+        for batch in tqdm.tqdm(dataloader, desc="Evaluation progress"):
+            # Move data to device
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels = batch['label'].to(device)
             
-            # 前向传播
+            # Forward pass
             outputs = model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 labels=labels
             )
             
-            # 获取预测结果
+            # Get prediction results
             logits = outputs.logits
             
-            # 对于语言模型，我们比较下一个token的预测
-            # 输入: [seq_len-1], 标签: [seq_len-1] (从第二个token开始)
-            # 预测: [seq_len-1, vocab_size]
+            # For language models, we compare next token predictions
+            # Input: [seq_len-1], Labels: [seq_len-1] (starting from second token)
+            # Predictions: [seq_len-1, vocab_size]
             
-            # 获取每个位置的预测token
+            # Get predicted tokens for each position
             predicted_tokens = torch.argmax(logits, dim=-1)  # [batch_size, seq_len-1]
             
-            # 计算准确率（忽略padding和-100标签）
+            # Calculate accuracy (ignore padding and -100 labels)
             valid_mask = (labels != -100) & (attention_mask[:, :-1] == 1)
             
-            # 比较预测和真实标签
+            # Compare predictions with true labels
             correct = (predicted_tokens == labels) & valid_mask
             correct_predictions += correct.sum().item()
             total_predictions += valid_mask.sum().item()
     
-    # 计算准确率
+    # Calculate accuracy
     accuracy = (correct_predictions / total_predictions * 100) if total_predictions > 0 else 0
     
-    print(f"准确率: {accuracy:.2f}%")
-    print(f"正确预测数: {correct_predictions}")
-    print(f"总预测数: {total_predictions}")
+    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Correct predictions: {correct_predictions}")
+    print(f"Total predictions: {total_predictions}")
     
-    # 保存结果
+    # Save results
     result = {
         "accuracy": accuracy,
         "correct_predictions": correct_predictions,
@@ -113,10 +113,10 @@ def eval_acc(
 
 
 if __name__ == "__main__":
-    # 测试代码
+    # Test code
     from src.dataset import get_dataset
     
-    # 创建测试数据集
+    # Create test dataset
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
     
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         dataset_names, tokenizer, dataset_seed, forget_ratio, self_retain
     )
     
-    # 测试评估
+    # Test evaluation
     accuracy = eval_acc(
         model_name="gpt2",
         retain_dataset=test_dataset,
@@ -137,4 +137,4 @@ if __name__ == "__main__":
         batch_size=4
     )
     
-    print(f"最终准确率: {accuracy:.2f}%") 
+    print(f"Final accuracy: {accuracy:.2f}%") 

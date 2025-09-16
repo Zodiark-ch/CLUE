@@ -31,7 +31,7 @@ class KL(BaseTrainer):
 
         forget_loss = kl_loss(prob_forget_p, prob_forget_q)
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -54,7 +54,7 @@ class KL(BaseTrainer):
                 retain_loss += kl_loss(prob_retain_p, prob_retain_q)
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = -self.gamma * forget_loss + retain_loss
@@ -81,7 +81,7 @@ class KL_GA(KL):
 
         forget_loss = -outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -104,7 +104,7 @@ class KL_GA(KL):
                 retain_loss += kl_loss(prob_retain_p, prob_retain_q)
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = self.gamma * forget_loss + retain_loss
@@ -131,7 +131,7 @@ class KL_CL(KL):
 
         forget_loss = outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -154,7 +154,7 @@ class KL_CL(KL):
                 retain_loss += kl_loss(prob_retain_p, prob_retain_q)
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = self.gamma * forget_loss + retain_loss

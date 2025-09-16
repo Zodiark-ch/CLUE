@@ -10,12 +10,12 @@ TEMPERATURE = 2 / 3
 FACTOR = 0.8
 
 def cdf_stretched_concrete(x, log_alpha):
-    # 检查log_alpha是否包含nan或inf
+    # Check if log_alpha contains nan or inf
     # if torch.isnan(log_alpha).any() or torch.isinf(log_alpha).any():
-    #     # 将nan和inf替换为安全值
+    #     # Replace nan and inf with safe values
     #     log_alpha_safe = log_alpha.clone()
-    #     log_alpha_safe[torch.isnan(log_alpha_safe)] = 10.0  # 将nan替换为10.0
-    #     log_alpha_safe[torch.isinf(log_alpha_safe)] = 10.0  # 将inf替换为10.0
+    #     log_alpha_safe[torch.isnan(log_alpha_safe)] = 10.0  # Replace nan with 10.0
+    #     log_alpha_safe[torch.isinf(log_alpha_safe)] = 10.0  # Replace inf with 10.0
     #     log_alpha = log_alpha_safe
     
     x_01 = (x - LIMIT_LEFT) / (LIMIT_RIGHT - LIMIT_LEFT)
@@ -29,7 +29,7 @@ def sample_z_from_u(u, log_alpha):
     return (LIMIT_RIGHT - LIMIT_LEFT) * s + LIMIT_LEFT
 
 def deterministic_z_from_log_alpha(log_alpha, apply_one=False):
-    # 检查log_alpha是否包含nan或in
+    # Check if log_alpha contains nan or inf
     size = np.prod(log_alpha.shape)
     
     # Since the distribution is stretched to [-eps, 1+eps], the prob of a variable <= 0 equals its prob to 0

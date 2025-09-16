@@ -61,7 +61,7 @@ class WMDPCyber(BaseDataset):
                 results["attention_mask"].append(torch.tensor(inputs["attention_mask"]))
                 results["label"].append(torch.tensor(inputs["input_ids"]))
                 results["question_length"].append(len(inputs["input_ids"]))
-                # 随机选择从第10个到第30个token开始的拒绝回答
+                # Randomly select refusal answer starting from 10th to 30th token
                 shuffle_idx = random.randint(10, 20)
                 refusal_answer = random.choice(refusal_answers)
                 refusal_tokenized = tokenizer(
@@ -76,7 +76,7 @@ class WMDPCyber(BaseDataset):
                 )
                 if len(refusal_label) < 2000:
                     refusal_label = refusal_label + [-100] * (2000 - len(refusal_label))
-                results["refused_label"].append(torch.tensor(refusal_label))#一些拒绝回答的样本
+                results["refused_label"].append(torch.tensor(refusal_label))# Some refusal answer samples
             return results
 
         train_dataset = self.dataset["train"].map(
@@ -199,7 +199,7 @@ class WMDPBio(BaseDataset):
                 )
                 if len(refusal_label) < 1024:
                     refusal_label = refusal_label + [-100] * (1024 - len(refusal_label))
-                results["refused_label"].append(torch.tensor(refusal_label))#一些拒绝回答的样本
+                results["refused_label"].append(torch.tensor(refusal_label))# Some refusal answer samples
             return results
 
         train_dataset = self.dataset["train"].map(

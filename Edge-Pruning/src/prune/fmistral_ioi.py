@@ -19,17 +19,17 @@
 
 import logging
 import os
-import psutil  # 添加系统监控
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-# 禁用wandb
+import psutil  # Add system monitoring
+
+# Disable wandb
 os.environ["WANDB_DISABLED"] = "true"
 os.environ["WANDB_MODE"] = "disabled"
 os.environ["WANDB_DISABLE_GPU_STATS"] = "true"
 os.environ["WANDB_DISABLE_CODE"] = "true"
-# 设置内存优化
+# Set memory optimization
 #os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
-# 设置CUDA内存分配策略
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # 启用同步CUDA操作，便于调试（已注释，避免性能下降）
+# Set CUDA memory allocation strategy
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # Enable synchronous CUDA operations for debugging (commented to avoid performance degradation)
 import torch
 import gc
 import pickle
@@ -167,7 +167,7 @@ class FMistralInfoTrainer(Seq2SeqTrainer):
         current_node_sparsity = self.get_current_layer_target_sparsity(self.state.global_step)
         # torch.cuda.synchronize()
         # torch.cuda.empty_cache()
-        # 添加错误处理和内存监控
+        # Add error handling and memory monitoring
         try:
             outputs = model(
                 input_ids=input_ids,
@@ -177,14 +177,14 @@ class FMistralInfoTrainer(Seq2SeqTrainer):
                 corr_x=corr_x
             )
         except RuntimeError as e:
-            print(f"CUDA错误: {e}")
-            print("尝试清理GPU内存并重试...")
-            # 暂时禁用自动缓存清理，避免CUDA错误
+            print(f"CUDA error: {e}")
+            print("Attempting to clear GPU memory and retry...")
+            # Temporarily disable automatic cache cleanup to avoid CUDA errors
             # if torch.cuda.is_available():
             #     torch.cuda.empty_cache()
             raise e
         
-        # 处理 edge_loss 和 node_loss
+        # Handle edge_loss and node_loss
         reg_edge_loss = outputs["edge_loss"]
         
         if self.skip_layer_loss_if_higher_sparsity and outputs["model_node_sparsity"] > outputs["target_node_sparsity"]:
@@ -200,7 +200,7 @@ class FMistralInfoTrainer(Seq2SeqTrainer):
             start_idx = start_idxes[i]
             end_idx = end_idxes[i]
             
-            # 添加调试信息
+            # Add debug information
             # if self.state.global_step % 100 == 0:
                 # print(f"  Sample {i}: start_idx={start_idx}, end_idx={end_idx}")
                 # print(f"    logits shape: {logits[i].shape}")
@@ -214,7 +214,7 @@ class FMistralInfoTrainer(Seq2SeqTrainer):
             kl_loss_component = nn.functional.kl_div(logits_i, logits_mistral_i, reduction='batchmean', log_target=True)
             kl_loss += kl_loss_component
             
-            # 添加调试信息
+            # Add debug information
             if self.state.global_step % 100 == 0:
                 print(f"    kl_loss_component: {kl_loss_component.item():.6f}")
             
@@ -226,9 +226,9 @@ class FMistralInfoTrainer(Seq2SeqTrainer):
         outputs["loss"] = loss
         outputs["kl_loss"] = kl_loss
 
-        # 清理GPU内存
+        # Clear GPU memory
         del logits_mistral, corr_x
-        # 暂时禁用自动缓存清理，避免CUDA错误
+        # Temporarily disable automatic cache cleanup to avoid CUDA errors
         # torch.cuda.empty_cache()
         gc.collect()
 
@@ -523,13 +523,13 @@ class DataCollatorIOI:
             corr_input_ids_all.append(corr_input_ids)
             labels_all.append(labels)
             
-            # 安全地找到第一个padding位置
+            # Safely find the first padding position
             pad_positions = (input_ids == self.tokenizer.pad_token_id).nonzero()
             if pad_positions.numel() > 0:
                 first_pad = pad_positions[0]
                 end_idx = first_pad - 1
             else:
-                # 如果没有padding，使用序列长度
+                # If no padding, use sequence length
                 first_pad = len(input_ids)
                 end_idx = len(input_ids) - 1
             
@@ -585,7 +585,7 @@ def eval_fn(eval_pred):
     }
     
 def print_memory_usage():
-    """打印当前内存使用情况"""
+    """Print current memory usage"""
     process = psutil.Process()
     memory_info = process.memory_info()
     print(f"CPU Memory: {memory_info.rss / 1024 / 1024:.1f} MB")
@@ -653,10 +653,10 @@ def main():
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
     
-    # 获取脚本所在目录的上级目录（Edge-Pruning目录）
+    # Get the parent directory of the script directory (Edge-Pruning directory)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    edge_pruning_dir = os.path.dirname(script_dir)  # 从 src/prune 到 src
-    edge_pruning_dir = os.path.dirname(edge_pruning_dir)  # 从 src 到 Edge-Pruning
+    edge_pruning_dir = os.path.dirname(script_dir)  # From src/prune to src
+    edge_pruning_dir = os.path.dirname(edge_pruning_dir)  # From src to Edge-Pruning
     config_path = os.path.join(edge_pruning_dir, 'config.json')
     
     sys.argv = [os.path.abspath(__file__), config_path]
@@ -723,42 +723,42 @@ def main():
     raw_datasets = load_datasets(data_args.dataset_path, data_args.max_train_samples, data_args.max_eval_samples, train_split=data_args.train_split)
     n_train = len(raw_datasets["train"])
     
-    # 自动分配模型到多个GPU
-    device_map = "auto"  # 或者使用 "balanced" 来平衡分配
+    # Automatically distribute model to multiple GPUs
+    device_map = "auto"  # Or use "balanced" for balanced allocation
     
-    # 添加内存优化参数
+    # Add memory optimization parameters
     model = FMistralForCausalLM.from_pretrained(
         model_args.initialize_from,
         with_embedding_nodes=True,
         disable_linear_regularization_term=data_args.disable_linear_reg_term,
         device_map=device_map,
-        torch_dtype=torch.float32,  # 使用float32避免半精度问题
-        offload_folder="./offload",  # 设置模型卸载目录
+        torch_dtype=torch.float32,  # Use float32 to avoid half-precision issues
+        offload_folder="./offload",  # Set model offload directory
     )
     mistral_model = FMistralForCausalLM.from_pretrained(
         "HuggingFaceH4/zephyr-7b-beta",
         with_embedding_nodes=True,
-        cache_dir='/data/zodiark/CSAT/.cache',
+        cache_dir='',
         device_map=device_map,
-        torch_dtype=torch.float32,  # 使用float32避免半精度问题
-        offload_folder="./offload",  # 设置模型卸载目录
+        torch_dtype=torch.float32,  # Use float32 to avoid half-precision issues
+        offload_folder="./offload",  # Set model offload directory
     )
     
-    # 冻结mistral_model的所有参数
+    # Freeze all parameters of mistral_model
     for param in mistral_model.parameters():
         param.requires_grad = False
     
-    # 验证mistral_model参数冻结状态
+    # Verify mistral_model parameter freeze status
     mistral_trainable_params = sum(p.numel() for p in mistral_model.parameters() if p.requires_grad)
-    print(f"mistral_model的所有参数已冻结，可训练参数数量: {mistral_trainable_params}")
+    print(f"All parameters of mistral_model have been frozen, trainable parameter count: {mistral_trainable_params}")
     
     tokenizer = AutoTokenizer.from_pretrained("HuggingFaceH4/zephyr-7b-beta")
     tokenizer.pad_token = tokenizer.eos_token
     
     freeze_all_except_pruning_params(model)
     
-    # 打印可训练参数信息
-    print("=== 可训练参数信息 ===")
+    # Print trainable parameter information
+    print("=== Trainable Parameter Information ===")
     trainable_params = []
     total_params = 0
     for name, param in model.named_parameters():
@@ -766,12 +766,12 @@ def main():
             trainable_params.append((name, param.numel()))
             total_params += param.numel()
     
-    print(f"总可训练参数数量: {total_params:,}")
-    print("\n可训练参数详情:")
+    print(f"Total trainable parameter count: {total_params:,}")
+    print("\nTrainable parameter details:")
     for name, numel in trainable_params:
-        print(f"  {name}: {numel:,} 参数")
+        print(f"  {name}: {numel:,} parameters")
     
-    print("\n=== 参数分组信息 ===")
+    print("\n=== Parameter Group Information ===")
     optimizer_1_group = []
     optimizer_2_group = []
     optimizer_3_group = []
@@ -787,26 +787,26 @@ def main():
         elif ('sparsity_lambda_nodes' in n) and (not data_args.disable_node_loss):
             optimizer_4_group.append(n)
     
-    print(f"Optimizer Group 1 (read_log_alpha): {len(optimizer_1_group)} 参数")
+    print(f"Optimizer Group 1 (read_log_alpha): {len(optimizer_1_group)} parameters")
     for name in optimizer_1_group:
         print(f"  {name}")
     
-    print(f"\nOptimizer Group 2 (sparsity_lambda_edges): {len(optimizer_2_group)} 参数")
+    print(f"\nOptimizer Group 2 (sparsity_lambda_edges): {len(optimizer_2_group)} parameters")
     for name in optimizer_2_group:
         print(f"  {name}")
     
-    print(f"\nOptimizer Group 3 (write_log_alpha): {len(optimizer_3_group)} 参数")
+    print(f"\nOptimizer Group 3 (write_log_alpha): {len(optimizer_3_group)} parameters")
     for name in optimizer_3_group:
         print(f"  {name}")
     
-    print(f"\nOptimizer Group 4 (sparsity_lambda_nodes): {len(optimizer_4_group)} 参数")
+    print(f"\nOptimizer Group 4 (sparsity_lambda_nodes): {len(optimizer_4_group)} parameters")
     for name in optimizer_4_group:
         print(f"  {name}")
     
     print("=" * 50)
     
-    # 打印参数统计信息
-    print("\n=== 参数统计信息 ===")
+    # Print parameter statistics
+    print("\n=== Parameter Statistics ===")
     param_stats = {}
     for name, param in model.named_parameters():
         if param.requires_grad:
@@ -828,23 +828,23 @@ def main():
             param_stats[param_type]["total_params"] += param.numel()
     
     for param_type, stats in param_stats.items():
-        print(f"{param_type}: {stats['count']} 个参数组, 总计 {stats['total_params']:,} 参数")
+        print(f"{param_type}: {stats['count']} parameter groups, total {stats['total_params']:,} parameters")
     
-    # 对比两个模型的参数状态
-    print("\n=== 模型参数状态对比 ===")
+    # Compare parameter status of both models
+    print("\n=== Model Parameter Status Comparison ===")
     model_total_params = sum(p.numel() for p in model.parameters())
     model_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     mistral_total_params = sum(p.numel() for p in mistral_model.parameters())
     mistral_trainable_params = sum(p.numel() for p in mistral_model.parameters() if p.requires_grad)
     
-    print(f"model: 总参数 {model_total_params:,}, 可训练参数 {model_trainable_params:,}")
-    print(f"mistral_model: 总参数 {mistral_total_params:,}, 可训练参数 {mistral_trainable_params:,}")
-    print(f"可训练参数比例: model={model_trainable_params/model_total_params*100:.2f}%, mistral_model={mistral_trainable_params/mistral_total_params*100:.2f}%")
+    print(f"model: total parameters {model_total_params:,}, trainable parameters {model_trainable_params:,}")
+    print(f"mistral_model: total parameters {mistral_total_params:,}, trainable parameters {mistral_trainable_params:,}")
+    print(f"Trainable parameter ratio: model={model_trainable_params/model_total_params*100:.2f}%, mistral_model={mistral_trainable_params/mistral_total_params*100:.2f}%")
     
     
     
-    # 打印初始内存使用情况
-    #print("=== 初始内存使用情况 ===")
+    # Print initial memory usage
+    #print("=== Initial Memory Usage ===")
     #print_memory_usage()
 
     if training_args.do_train:
@@ -863,9 +863,9 @@ def main():
         max_length=data_args.max_seq_length
     )
     
-    # 优化数据加载设置
-    training_args.dataloader_num_workers = 2  # 减少数据加载进程数
-    training_args.dataloader_pin_memory = False  # 禁用内存固定
+    # Optimize data loading settings
+    training_args.dataloader_num_workers = 2  # Reduce data loading process count
+    training_args.dataloader_pin_memory = False  # Disable memory pinning
     
     optimizers = get_optimizers(
         model, 
@@ -878,7 +878,7 @@ def main():
         disable_node_loss=data_args.disable_node_loss
     )
 
-    # 禁用wandb报告
+    # Disable wandb reporting
     training_args.report_to = []
     
     # Initialize our Trainer
@@ -913,15 +913,15 @@ def main():
             )
         except Exception as e:
             print(f"Training error: {e}")
-            # 暂时禁用自动缓存清理，避免CUDA错误
+            # Temporarily disable automatic cache cleanup to avoid CUDA errors
             # torch.cuda.empty_cache()
             gc.collect()
             raise
         finally:
-            # 暂时禁用自动缓存清理，避免CUDA错误
+            # Temporarily disable automatic cache cleanup to avoid CUDA errors
             # torch.cuda.empty_cache()
             gc.collect()
-            #print("=== 训练后内存使用情况 ===")
+            #print("=== Post-training Memory Usage ===")
             #print_memory_usage()
         metrics = train_result.metrics
         max_train_samples = (

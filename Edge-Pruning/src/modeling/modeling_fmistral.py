@@ -48,7 +48,7 @@ if is_flash_attn_2_available():
     from flash_attn import flash_attn_func, flash_attn_varlen_func
     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+
 
 logger = logging.get_logger(__name__)
 
@@ -93,7 +93,7 @@ class FMistralRotaryEmbedding(nn.Module):
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
-        # 延迟初始化 inv_freq，避免 meta tensor 问题
+        # Delay initialization of inv_freq to avoid meta tensor issues
         self._inv_freq = None
         self._device = device
 
@@ -259,16 +259,16 @@ def get_mask(log_alpha, training=False, threshold_for_deterministic=None, apply_
     return mask
 
 def safe_tensor_add(a, b):
-    """安全的张量加法，避免内存重叠问题"""
-    # 检查是否需要克隆以避免内存重叠
+    """Safe tensor addition to avoid memory overlap issues"""
+    # Check if cloning is needed to avoid memory overlap
     if a.is_contiguous() and b.is_contiguous():
         return a + b
     else:
-        # 如果张量不连续，先克隆再相加
+        # If tensor is not contiguous, clone first then add
         return a.contiguous() + b.contiguous()
 
 def log_memory_usage(stage=""):
-    """记录内存使用情况"""
+    """Record memory usage"""
     if torch.cuda.is_available():
         allocated = torch.cuda.memory_allocated() / 1024**3  # GB
         reserved = torch.cuda.memory_reserved() / 1024**3   # GB
@@ -696,9 +696,9 @@ class FMistralSdpaAttention(FMistralAttention):
 
         _, bsz, q_len, _ = q_hidden_states.size()
         
-        # 使用_apply_headwise_linear正确处理维度转换
+        # Use _apply_headwise_linear to properly handle dimension conversion
         # q_hidden_states: (num_heads, batch_size, seq_len, head_dim)
-        # 直接使用_apply_headwise_linear，它会返回 (batch_size, num_heads, seq_len, head_dim)
+        # Directly use _apply_headwise_linear, it returns (batch_size, num_heads, seq_len, head_dim)
         query_states = self._apply_headwise_linear(q_hidden_states, self.q_proj.weight, self.num_heads)
         key_states = self._apply_headwise_linear(k_hidden_states, self.k_proj.weight, self.num_key_value_heads)
         value_states = self._apply_headwise_linear(v_hidden_states, self.v_proj.weight, self.num_key_value_heads)
@@ -778,7 +778,7 @@ class FMistralDecoderLayer(nn.Module):
         # Edge pruning thresholds
         self.edge_threshold_for_deterministic = None
         self.node_threshold_for_deterministic = None
-        # 从attention层的权重获取dtype，确保与模型其他部分一致
+        # Get dtype from attention layer weights to ensure consistency with other model parts
         self._dtype = self.self_attn.q_proj.weight.dtype
         
         # Calculate writer and reader indices
@@ -788,8 +788,8 @@ class FMistralDecoderLayer(nn.Module):
         self.mlp_writer_idx = writer_offset + (layer_idx + 1) * (self.num_heads + 1) - 1
         self.mlp_reader_idx = (layer_idx + 1) * (self.num_heads + 2 * self.num_key_value_heads + 1) - 1
         
-        # Initialize log_alphas for attention - 使用更安全的初始化方法
-        # 直接使用torch.full创建，避免torch.empty的未初始化内存问题
+        # Initialize log_alphas for attention - use safer initialization method
+        # Directly use torch.full to avoid uninitialized memory issues with torch.empty
         self.q_read_log_alphas = nn.Parameter(torch.empty(self.num_writers, self.num_heads, dtype=self._dtype))
         self.k_read_log_alphas = nn.Parameter(torch.empty(self.num_writers, self.num_key_value_heads, dtype=self._dtype))
         self.v_read_log_alphas = nn.Parameter(torch.empty(self.num_writers, self.num_key_value_heads, dtype=self._dtype))
@@ -813,7 +813,7 @@ class FMistralDecoderLayer(nn.Module):
         )
         self.register_buffer("attn_write_common_mask", attn_write_common_mask)
         
-        # Initialize log_alphas for MLP - 使用更安全的初始化方法
+        # Initialize log_alphas for MLP - use safer initialization method
         self.mlp_read_log_alphas = nn.Parameter(torch.empty(self.num_writers, dtype=self._dtype))
         self.mlp_write_log_alphas = nn.Parameter(torch.tensor([0.0], dtype=self._dtype))
         self.mlp_read_log_alphas.data.normal_(mean=10.0, std=0.01)
@@ -829,7 +829,7 @@ class FMistralDecoderLayer(nn.Module):
         mlp_write_common_mask[self.mlp_writer_idx, 0] = 1
         self.register_buffer("mlp_write_common_mask", mlp_write_common_mask)
 
-        # 添加标志来跟踪alphas是否已初始化
+        # Add flag to track whether alphas are initialized
         self._alphas_initialized = False
 
     @torch.no_grad()
@@ -943,7 +943,7 @@ class FMistralDecoderLayer(nn.Module):
         k_m = get_mask(self.k_read_log_alphas, training=self.training, threshold_for_deterministic=self.edge_threshold_for_deterministic)
         v_m = get_mask(self.v_read_log_alphas, training=self.training, threshold_for_deterministic=self.edge_threshold_for_deterministic)
         
-        # 确保mask在正确的设备上
+        # Ensure mask is on correct device
         q_m = q_m.to(device=x.device, dtype=x.dtype)
         k_m = k_m.to(device=x.device, dtype=x.dtype)
         v_m = v_m.to(device=x.device, dtype=x.dtype)
@@ -957,14 +957,14 @@ class FMistralDecoderLayer(nn.Module):
         x_v = torch.einsum("wbsd,wh->hbsd", x, v_z)
         
         if embeds is not None:
-            # 确保embeds在正确的设备上
+            
             embeds = embeds.to(device=x.device, dtype=x.dtype)
             x_q = x_q + embeds.unsqueeze(0)
             x_k = x_k + embeds.unsqueeze(0)
             x_v = x_v + embeds.unsqueeze(0)
         
         if corr_x is not None:
-            # 确保corr_x在正确的设备上
+          
             corr_x = corr_x.to(device=x.device, dtype=x.dtype)
             x_q = x_q + torch.einsum("wbsd,wh->hbsd", corr_x, (1-q_m) * self.attn_read_common_mask)
             x_k = x_k + torch.einsum("wbsd,wh->hbsd", corr_x, (1-k_m) * self.attn_read_common_mask)
@@ -982,14 +982,14 @@ class FMistralDecoderLayer(nn.Module):
             self.attn_write_log_alphas, 
             training=self.training, 
             threshold_for_deterministic=self.node_threshold_for_deterministic
-        ).reshape(-1, 1, 1, 1)  # 改为 (num_heads, 1, 1, 1) 以匹配 (num_heads, batch_size, seq_len, hidden_size)
+        ).reshape(-1, 1, 1, 1) 
         
-        # 确保z在正确的设备上
+      
         z = z.to(device=x.device, dtype=x.dtype)
         x = x * z
         
         if corr_x is not None:
-            # 确保corr_x在正确的设备上
+           
             corr_x = corr_x.to(device=x.device, dtype=x.dtype)
             x = x + corr_x[self.attn_writer_idx : self.attn_writer_idx + self.num_heads] * (1-z)
             
@@ -1006,18 +1006,18 @@ class FMistralDecoderLayer(nn.Module):
         # embeds, if it exists, is (batch_size, sequence_length, hidden_size)
         m = get_mask(self.mlp_read_log_alphas, training=self.training, threshold_for_deterministic=self.edge_threshold_for_deterministic)
 
-        # 确保mask在正确的设备上
+        # Ensure mask is on correct device
         m = m.to(device=x.device, dtype=x.dtype)
 
         z = m * self.mlp_read_common_mask
         x_z = torch.einsum("wbsd,w->bsd", x, z)
         
         if embeds is not None:
-            # 确保embeds在正确的设备上
+           
             embeds = embeds.to(device=x.device, dtype=x.dtype)
             x_z = x_z + embeds
         if corr_x is not None:
-            # 确保corr_x在正确的设备上
+            
             corr_x = corr_x.to(device=x.device, dtype=x.dtype)
             x_z = x_z + torch.einsum("wbsd,w->bsd", corr_x, (1-m) * self.mlp_read_common_mask)
 
@@ -1035,12 +1035,12 @@ class FMistralDecoderLayer(nn.Module):
             threshold_for_deterministic=self.node_threshold_for_deterministic
         ).reshape(1, 1, 1)
         
-        # 确保z在正确的设备上
+       
         z = z.to(device=x.device, dtype=x.dtype)
         x = x * z
         
         if corr_x is not None:
-            # 确保corr_x在正确的设备上
+           
             corr_x = corr_x.to(device=x.device, dtype=x.dtype)
             x = x + corr_x[self.mlp_writer_idx] * (1-z)
             
@@ -1065,10 +1065,10 @@ class FMistralDecoderLayer(nn.Module):
         # 延迟初始化alphas，解决device_map="auto"时meta设备无法申请内存的问题
         if not self._alphas_initialized:
             with torch.no_grad():
-                # 获取当前输入数据的设备
+               
                 target_device = hidden_states.device
                 
-                # 确保所有alphas参数在正确的设备上
+                
                 for alpha_param in [self.q_read_log_alphas, self.k_read_log_alphas, self.v_read_log_alphas,
                                    self.attn_write_log_alphas, self.mlp_read_log_alphas, self.mlp_write_log_alphas]:
                     if alpha_param.device != target_device:
@@ -1077,31 +1077,20 @@ class FMistralDecoderLayer(nn.Module):
             self._alphas_initialized = True
         
         # hidden_states is now (writers, batch_size, sequence_length, hidden_size)
-        if torch.isnan(self.q_read_log_alphas).any() or torch.isinf(self.q_read_log_alphas).any():
-            print(f"警告: log_alpha包含nan或inf值")
-            print(f"  nan数量: {torch.isnan(self.q_read_log_alphas).sum().item()}")
-            print(f"  inf数量: {torch.isinf(self.q_read_log_alphas).sum().item()}")
-        if torch.isnan(self.k_read_log_alphas).any() or torch.isinf(self.k_read_log_alphas).any():
-            print(f"警告: log_alpha包含nan或inf值")
-            print(f"  nan数量: {torch.isnan(self.k_read_log_alphas).sum().item()}")
-            print(f"  inf数量: {torch.isinf(self.k_read_log_alphas).sum().item()}")
-        if torch.isnan(self.v_read_log_alphas).any() or torch.isinf(self.v_read_log_alphas).any():
-            print(f"警告: log_alpha包含nan或inf值")
-            print(f"  nan数量: {torch.isnan(self.v_read_log_alphas).sum().item()}")
-            print(f"  inf数量: {torch.isinf(self.v_read_log_alphas).sum().item()}")
+        
         
         residual = hidden_states
         
         # Self Attention
-        # 首先进行attention read操作
+    
         q_hidden_states, k_hidden_states, v_hidden_states, z_attn_edges_sum = self.attn_read(hidden_states, corr_x=corr_x, embeds=embeds)
         
-        # 对q, k, v分别应用layer norm（与FLlama一致）
+
         q_hidden_states = self.input_layernorm(q_hidden_states)
         k_hidden_states = self.input_layernorm(k_hidden_states)
         v_hidden_states = self.input_layernorm(v_hidden_states)
         
-        # 直接传递给attention模块
+
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             q_hidden_states=q_hidden_states,
             k_hidden_states=k_hidden_states,
@@ -1117,13 +1106,13 @@ class FMistralDecoderLayer(nn.Module):
         residual, z_attn_nodes_sum = self.attn_write(residual, hidden_states, corr_x=corr_x)
 
         # Fully Connected
-        # 进行MLP read操作
+  
         hidden_states, z_mlp_edges_sum = self.mlp_read(residual, corr_x=corr_x, embeds=embeds)
         
-        # 对MLP输入应用layer norm（与FLlama一致）
+    
         hidden_states = self.post_attention_layernorm(hidden_states)
         
-        # 对MLP输入应用MLP
+    
         hidden_states = self.mlp(hidden_states)
         
         hidden_states, z_mlp_nodes_sum = self.mlp_write(residual, hidden_states, corr_x=corr_x)
@@ -1228,7 +1217,7 @@ class FMistralModel(FMistralPreTrainedModel):
         if getattr(config, "pretraining_tp", 1) != 1:
             logger.warn("`pretraining_tp` is deprecated, please use `model.tensor_parallel` instead.")
 
-        # 添加稀疏性相关的参数
+    
         self.num_heads = config.num_attention_heads
         self.num_key_value_heads = config.num_key_value_heads
         self.num_writers = num_writers(config, with_embedding_nodes=with_embedding_nodes)
@@ -1238,14 +1227,14 @@ class FMistralModel(FMistralPreTrainedModel):
         self.num_nodes = num_nodes(config, with_embedding_nodes=with_embedding_nodes)
         self.edge_threshold_for_deterministic = None
         self.node_threshold_for_deterministic = None
-        # 从embedding层的权重获取dtype，确保与模型其他部分一致
+
         self._dtype = self.embed_tokens.weight.dtype
         
         if self.with_embedding_nodes:
             self.token_write_log_alpha = nn.Parameter(torch.tensor([0.0], dtype=self._dtype))
             self.token_write_log_alpha.data.normal_(mean=10.0, std=0.01)
             
-            # 延迟初始化 token_write_mask，避免设备映射问题
+  
             self._token_write_mask_initialized = False
         self.final_read_log_alphas = nn.Parameter(torch.empty(self.num_writers, dtype=self._dtype))
         self.final_read_log_alphas.data.normal_(mean=10.0, std=0.01)
@@ -1259,7 +1248,7 @@ class FMistralModel(FMistralPreTrainedModel):
         self.sparsity_lambda_edges_2 = nn.Parameter(torch.tensor([0.0], dtype=self._dtype))
         self.sparsity_lambda_nodes_2 = nn.Parameter(torch.tensor([0.0], dtype=self._dtype))
 
-        # 添加标志来跟踪alphas是否已初始化
+        # Add flag to track whether alphas are initialized
         self._alphas_initialized = False
 
         # Initialize weights and apply final processing
@@ -1313,7 +1302,7 @@ class FMistralModel(FMistralPreTrainedModel):
     def get_edge_sparsity(self):
         edge_masks = self.get_edge_masks()
         def process(mask):
-            # 确保在CPU上计算，避免设备不匹配问题
+           
             if isinstance(mask, torch.Tensor):
                 return 1.0 - mask.cpu().float().mean().item()
             else:
@@ -1338,7 +1327,7 @@ class FMistralModel(FMistralPreTrainedModel):
         def process(mask):
             return torch.sum(mask), torch.numel(mask)
         
-        # 使用CPU进行计算，避免多设备问题
+      
         s, n = 0, 0
         if self.with_embedding_nodes:
             mask = node_masks[0][0]
@@ -1361,7 +1350,7 @@ class FMistralModel(FMistralPreTrainedModel):
     def get_effective_edge_sparsity(self):
         edge_masks = self.get_edge_masks()
         def process(mask):
-            # 确保在CPU上计算，避免设备不匹配问题
+           
             if isinstance(mask, torch.Tensor):
                 return 1.0 - mask.cpu().float().mean().item()
             else:
@@ -1496,14 +1485,14 @@ class FMistralModel(FMistralPreTrainedModel):
             self.layers[layer_idx].load_mlp_log_alphas(mlp_in_edges)
         self.load_resid_post_log_alphas(resid_post_edges)
 
-    # 这是FMistralModel的_ensure_alphas_on_correct_device，只操作embedding相关参数
+  
     def _ensure_alphas_on_correct_device(self, target_device):
-        """确保所有alphas参数在正确的设备上"""
+       
         with torch.no_grad():
             if self.with_embedding_nodes:
                 if self.token_write_log_alpha.device != target_device:
                     self.token_write_log_alpha.data = self.token_write_log_alpha.data.to(target_device)
-                # 延迟初始化 token_write_mask
+             
                 if not self._token_write_mask_initialized:
                     token_write_mask = torch.zeros(self.num_writers, dtype=self._dtype, device=target_device)
                     token_write_mask[0] = 1
@@ -1519,16 +1508,16 @@ class FMistralModel(FMistralPreTrainedModel):
         # corr_x, if it exists, is (writers, batch_size, sequence_length, hidden_size)
         # embeds, if it exists, is (batch_size, sequence_length, hidden_size)
         z = get_mask(self.final_read_log_alphas, training=self.training, threshold_for_deterministic=self.edge_threshold_for_deterministic)
-        # 确保z在正确的设备上
+    
         z = z.to(device=x.device, dtype=x.dtype)
         x_z = torch.einsum("wbsd,w->bsd", x, z)
         
         if embeds is not None:
-            # 确保embeds在正确的设备上
+        
             embeds = embeds.to(device=x.device, dtype=x.dtype)
             x_z = x_z + embeds
         if corr_x is not None:
-            # 确保corr_x在正确的设备上
+          
             corr_x = corr_x.to(device=x.device, dtype=x.dtype)
             x_z = x_z + torch.einsum("wbsd,w->bsd", corr_x, (1-z))
             
@@ -1576,20 +1565,20 @@ class FMistralModel(FMistralPreTrainedModel):
         corr_x = None,
         output_writer_states: Optional[bool] = False,
     ) -> Union[Tuple, FMistralModelOutput]:
-        # 延迟初始化alphas，解决device_map="auto"时meta设备无法申请内存的问题
+        
         if not self._alphas_initialized:
             with torch.no_grad():
-                # 获取当前输入数据的设备
+             
                 target_device = inputs_embeds.device if inputs_embeds is not None else torch.device('cuda:0')
                 
                 if self.with_embedding_nodes:
-                    # 确保token_write_log_alpha在正确的设备上
+               
                     if self.token_write_log_alpha.device != target_device:
                         self.token_write_log_alpha.data = self.token_write_log_alpha.data.to(target_device)
                     self.token_write_log_alpha.data.normal_(mean=10.0, std=0.01)
                     
                 
-                # 确保final_read_log_alphas在正确的设备上
+             
                 if self.final_read_log_alphas.device != target_device:
                     self.final_read_log_alphas.data = self.final_read_log_alphas.data.to(target_device)
                 self.final_read_log_alphas.data.normal_(mean=10.0, std=0.01)
@@ -1620,7 +1609,7 @@ class FMistralModel(FMistralPreTrainedModel):
             if past_key_values is None:
                 past_key_values = DynamicCache()
             else:
-                # 安全地处理legacy cache，避免0维tensor的问题
+             
                 try:
                     past_key_values = DynamicCache.from_legacy_cache(past_key_values)
                     logger.warning_once(
@@ -1629,7 +1618,7 @@ class FMistralModel(FMistralPreTrainedModel):
                         "(https://huggingface.co/docs/transformers/kv_cache#legacy-cache-format)"
                     )
                 except (TypeError, ValueError, IndexError) as e:
-                    # 如果转换失败，创建一个新的DynamicCache
+          
                     #logger.warning(f"Failed to convert legacy cache: {e}. Creating new DynamicCache.")
                     past_key_values = DynamicCache()
 
@@ -1656,7 +1645,7 @@ class FMistralModel(FMistralPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
-        # 初始化累积的z值 - 延迟初始化，等待第一个layer的输出
+   
         z_edges_sum_total = None
         z_nodes_sum_total = None
         
@@ -1692,12 +1681,12 @@ class FMistralModel(FMistralPreTrainedModel):
 
             hidden_states, z_layer_edges_sum, z_layer_nodes_sum = layer_outputs[0], layer_outputs[1], layer_outputs[2]
             
-            # 确保z值在正确的设备上
+   
             if isinstance(z_layer_edges_sum, torch.Tensor):
                 if not isinstance(z_edges_sum_total, torch.Tensor):
                     z_edges_sum_total = torch.tensor(0.0, device=z_layer_edges_sum.device, dtype=z_layer_edges_sum.dtype)
                 else:
-                    # 如果累积变量已经在不同设备上，需要移动到当前tensor的设备上
+        
                     if z_edges_sum_total.device != z_layer_edges_sum.device:
                         z_edges_sum_total = z_edges_sum_total.to(device=z_layer_edges_sum.device, dtype=z_layer_edges_sum.dtype)
                 z_edges_sum_total = z_edges_sum_total + z_layer_edges_sum
@@ -1708,7 +1697,7 @@ class FMistralModel(FMistralPreTrainedModel):
                 if not isinstance(z_nodes_sum_total, torch.Tensor):
                     z_nodes_sum_total = torch.tensor(0.0, device=z_layer_nodes_sum.device, dtype=z_layer_nodes_sum.dtype)
                 else:
-                    # 如果累积变量已经在不同设备上，需要移动到当前tensor的设备上
+           
                     if z_nodes_sum_total.device != z_layer_nodes_sum.device:
                         z_nodes_sum_total = z_nodes_sum_total.to(device=z_layer_nodes_sum.device, dtype=z_layer_nodes_sum.dtype)
                 z_nodes_sum_total = z_nodes_sum_total + z_layer_nodes_sum
@@ -1721,8 +1710,8 @@ class FMistralModel(FMistralPreTrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[3],)
             
-            # 暂时禁用内存清理，避免CUDA错误
-            # if hasattr(torch.cuda, 'empty_cache') and torch.rand(1).item() < 0.05:  # 5%概率清理
+        
+            # if hasattr(torch.cuda, 'empty_cache') and torch.rand(1).item() < 0.05: 
             #     torch.cuda.empty_cache()
 
         if output_writer_states:
@@ -1732,12 +1721,12 @@ class FMistralModel(FMistralPreTrainedModel):
 
         hidden_states, z_final_edges_sum = self.read(hidden_states, corr_x=corr_x, embeds=embeds)
         
-        # 确保z值在正确的设备上
+    
         if isinstance(z_final_edges_sum, torch.Tensor):
             if z_edges_sum_total is None:
                 z_edges_sum_total = torch.tensor(0.0, device=z_final_edges_sum.device, dtype=z_final_edges_sum.dtype)
             else:
-                # 如果累积变量已经在不同设备上，需要移动到当前tensor的设备上
+              
                 if z_edges_sum_total.device != z_final_edges_sum.device:
                     z_edges_sum_total = z_edges_sum_total.to(device=z_final_edges_sum.device, dtype=z_final_edges_sum.dtype)
             z_edges_sum_total = z_edges_sum_total + z_final_edges_sum
@@ -1752,27 +1741,17 @@ class FMistralModel(FMistralPreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
         
-        # 循环结束后立即清理内存
-        #log_memory_usage("After decoder layers")
-        # 暂时禁用自动缓存清理，避免CUDA错误
-        # if hasattr(torch.cuda, 'empty_cache'):
-        #     torch.cuda.empty_cache()
-        # log_memory_usage("After cache cleanup")
+
 
         next_cache = next_decoder_cache if use_cache else None
-        # if return_legacy_cache:
-        #     next_cache = next_cache.to_legacy_cache()
 
-        # ===== edge_loss/node_loss 计算 =====
-        # 1. 获取所有edge/node mask
         edge_masks = self.get_edge_masks()
         node_masks = self.get_node_masks()
-        # 2. 统计边/节点稀疏度 - 处理多GPU并行情况
-        # 确保使用float32进行计算，避免半精度问题
+
         compute_dtype = torch.float32
         n_edges = 0
         n_nodes = 0
-        # 确保z值是正确的tensor格式
+
         if isinstance(z_nodes_sum_total, torch.Tensor):
             z_nodes_sum = z_nodes_sum_total.to(device=hidden_states.device, dtype=compute_dtype)
         else:
@@ -1784,13 +1763,13 @@ class FMistralModel(FMistralPreTrainedModel):
             z_edges_sum = torch.tensor(z_edges_sum_total if z_edges_sum_total is not None else 0.0, device=hidden_states.device, dtype=compute_dtype)
         for masks in edge_masks:
             for m in masks:
-                # 确保tensor在正确的设备上，使用float32
+          
                 m = m.to(device=hidden_states.device, dtype=compute_dtype)
                 z_edges_sum += m.sum()
                 n_edges += m.numel()
         for masks in node_masks:
             for m in masks:
-                # 确保tensor在正确的设备上，使用float32
+  
                 m = m.to(device=hidden_states.device, dtype=compute_dtype)
                 z_nodes_sum += m.sum()
                 n_nodes += m.numel()
@@ -2012,7 +1991,7 @@ class FMistralForCausalLM(FMistralPreTrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        # 添加标志来跟踪alphas是否已初始化
+        # Add flag to track whether alphas are initialized
         self._alphas_initialized = False
 
         # Initialize weights and apply final processing
@@ -2097,23 +2076,23 @@ class FMistralForCausalLM(FMistralPreTrainedModel, GenerationMixin):
         # 延迟初始化alphas，解决device_map="auto"时meta设备无法申请内存的问题
         if not self._alphas_initialized:
             with torch.no_grad():
-                # 获取当前输入数据的设备
+    
                 target_device = inputs_embeds.device if inputs_embeds is not None else torch.device('cuda:0')
                 
                 if self.model.with_embedding_nodes:
-                    # 确保token_write_log_alpha在正确的设备上
+ 
                     if self.model.token_write_log_alpha.device != target_device:
                         self.model.token_write_log_alpha.data = self.model.token_write_log_alpha.data.to(target_device)
                     self.model.token_write_log_alpha.data.normal_(mean=10.0, std=0.01)
                     
-                    # 确保 token_write_mask 已初始化
+            
                     if not self.model._token_write_mask_initialized:
                         token_write_mask = torch.zeros(self.model.num_writers, dtype=self.model._dtype, device=target_device)
                         token_write_mask[0] = 1
                         self.model.register_buffer("token_write_mask", token_write_mask)
                         self.model._token_write_mask_initialized = True
                 
-                # 确保final_read_log_alphas在正确的设备上
+             
                 if self.model.final_read_log_alphas.device != target_device:
                     self.model.final_read_log_alphas.data = self.model.final_read_log_alphas.data.to(target_device)
                 self.model.final_read_log_alphas.data.normal_(mean=10.0, std=0.01)
@@ -2195,7 +2174,7 @@ class FMistralForCausalLM(FMistralPreTrainedModel, GenerationMixin):
                 max_cache_length = past_key_values.get_max_cache_shape()
                 cur_length = input_ids.shape[-1]
             else:
-                # 安全地获取cache_length，处理可能的0维tensor
+           
                 try:
                     first_cache_tensor = past_key_values[0][0]
                     if first_cache_tensor.dim() >= 3:
@@ -2203,7 +2182,7 @@ class FMistralForCausalLM(FMistralPreTrainedModel, GenerationMixin):
                     elif first_cache_tensor.dim() == 2:
                         cache_length = first_cache_tensor.shape[1]
                     else:
-                        # 如果是0维或1维tensor，假设cache_length为0
+           
                         cache_length = 0
                 except (IndexError, AttributeError):
                     cache_length = 0
@@ -2275,9 +2254,9 @@ if __name__ == '__main__':
         "HuggingFaceH4/zephyr-7b-beta",
         with_embedding_nodes=True,
         disable_linear_regularization_term=True,
-        torch_dtype=torch.float32,  # 使用float32避免半精度问题
+        torch_dtype=torch.float32, 
         device_map="auto",
-        offload_folder="./offload",  # 设置模型卸载目录
+        offload_folder="./offload", 
     )
     tokenizer = AutoTokenizer.from_pretrained("HuggingFaceH4/zephyr-7b-beta")
 
@@ -2285,19 +2264,17 @@ if __name__ == '__main__':
     input_ids = inputs["input_ids"]
     attention_mask = inputs["attention_mask"]
 
-    # 测试基本的 forward 功能
-    with torch.no_grad():
+  
         outputs = model(**inputs)
     print(f"Input shape: {inputs['input_ids'].shape}")
     print(f"Output logits shape: {outputs.logits.shape}")
     
-    # 测试 generate 方法是否存在
+
     if hasattr(model, 'generate'):
-        print("✓ generate 方法可用")
-        # 测试 generate 功能
+
+
         prediction = model.generate(input_ids, attention_mask=attention_mask, max_new_tokens=16, pad_token_id=tokenizer.pad_token_id)
         print(f"Generated text: {tokenizer.decode(prediction[0])}")
-    else:
-        print("✗ generate 方法不可用")
+
     
     print("Model loaded and ran successfully!") 

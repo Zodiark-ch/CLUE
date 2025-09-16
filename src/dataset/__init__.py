@@ -23,20 +23,20 @@ from typing import (
     Any,
     Optional,
 )
-# IOI数据集包装器，用于将IOI数据集转换为与其他数据集兼容的格式
+# IOI dataset wrapper for converting IOI dataset to format compatible with other datasets
 class IOIDatasetWrapper:
     def __init__(self, ioi_dataset, target_tokenizer):
         self.ioi_dataset = ioi_dataset
         self.target_tokenizer = target_tokenizer
         self.length = len(ioi_dataset)
         
-        # 使用GPT-2 tokenizer生成原始数据，然后转换为目标tokenizer格式
+        # Use GPT-2 tokenizer to generate original data, then convert to target tokenizer format
         self.converted_data = []
         for i in range(self.length):
-            # 获取原始文本
+            # Get original text
             original_text = self.ioi_dataset.ioi_prompts[i]["text"]
             
-            # 使用目标tokenizer重新tokenize
+            # Re-tokenize using target tokenizer
             tokenized = self.target_tokenizer(
                 original_text,
                 truncation=True,
@@ -46,35 +46,35 @@ class IOIDatasetWrapper:
                 return_tensors="pt"
             )
             
-            # 正确处理input_ids和label的对应关系
+            # Correctly handle correspondence between input_ids and label
             full_input_ids = tokenized.input_ids[0]
             full_attention_mask = tokenized.attention_mask[0]
             
-            # 找到最后一个非padding token的位置
+            # Find position of last non-padding token
             last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
             
-            # input_ids: 去掉最后一个非padding token
+            # input_ids: remove last non-padding token
             input_ids = full_input_ids[:last_non_padding_idx]
-            # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-            # 即：[BOS, token3, token4, ..., last_token]
+            # label: remove first token after BOS token, keep BOS, remove second token
+            # i.e.: [BOS, token3, token4, ..., last_token]
             label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
-            # attention_mask: 对应input_ids的长度
+            # attention_mask: corresponding to input_ids length
             attention_mask = full_attention_mask[:last_non_padding_idx]
             
-            # 直接padding到固定长度
-            max_len = 50  # 可以根据需要调整
+            # Directly pad to fixed length
+            max_len = 50  # Can be adjusted as needed
             pad_token_id = self.target_tokenizer.pad_token_id if self.target_tokenizer.pad_token_id is not None else 0
             
             # Padding input_ids
             input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
             
-            # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
+            # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
             label_padded = label.tolist() + [-100] * (max_len - len(label))
             
             # Padding attention_mask
             attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))
             
-            # 将padding后的数据存储
+            # Store padded data
             self.converted_data.append({
                 "input_ids": torch.tensor(input_ids_padded),
                 "attention_mask": torch.tensor(attention_mask_padded),
@@ -86,40 +86,40 @@ class IOIDatasetWrapper:
         return self.length
     
     def __getitem__(self, idx):
-        # 直接返回已经padding好的数据
+        # Directly return already padded data
         return self.converted_data[idx]
     
     def select(self, indices):
         """
-        添加select方法以支持UnlearnDataset的build_unlearn_dataset方法
+        Add select method to support UnlearnDataset's build_unlearn_dataset method
         """
         new_wrapper = IOIDatasetWrapper.__new__(IOIDatasetWrapper)
         new_wrapper.ioi_dataset = self.ioi_dataset
         new_wrapper.target_tokenizer = self.target_tokenizer
         new_wrapper.length = len(indices)
-        # 直接复制原始数据，让__getitem__方法处理padding
+        # Directly copy original data, let __getitem__ method handle padding
         new_wrapper.converted_data = [self.converted_data[i] for i in indices]
         return new_wrapper
 
-# Induction数据集包装器，用于将induction数据集转换为与其他数据集兼容的格式
+# Induction dataset wrapper for converting induction dataset to format compatible with other datasets
 class InductionDatasetWrapper:
     def __init__(self, induction_dataset, target_tokenizer):
         self.induction_dataset = induction_dataset
         self.target_tokenizer = target_tokenizer
         self.length = len(induction_dataset)
         
-        # 导入GPT-2 tokenizer用于解码
+        # Import GPT-2 tokenizer for decoding
         from transformers import GPT2TokenizerFast
         self.gpt2_tokenizer = GPT2TokenizerFast.from_pretrained('ArthurConmy/redwood_tokenizer')
         
-        # 转换数据
+        # Convert data
         self.converted_data = []
         for i in range(self.length):
-            # 1. 使用GPT-2 tokenizer将token tensor转换回文本
+            # 1. Use GPT-2 tokenizer to convert token tensor back to text
             gpt2_tokens = self.induction_dataset[i]
             original_text = self.gpt2_tokenizer.decode(gpt2_tokens, skip_special_tokens=True)
             
-            # 2. 使用目标tokenizer重新tokenize
+            # 2. Re-tokenize using target tokenizer
             tokenized = self.target_tokenizer(
                 original_text,
                 truncation=True,
@@ -129,36 +129,36 @@ class InductionDatasetWrapper:
                 return_tensors="pt"
             )
             
-            # 3. 正确处理input_ids和label的对应关系
+            # 3. Correctly handle correspondence between input_ids and label
             full_input_ids = tokenized.input_ids[0]
             full_attention_mask = tokenized.attention_mask[0]
             
-            # 找到最后一个非padding token的位置
+            # Find position of last non-padding token
             last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
             
-            # input_ids: 去掉最后一个非padding token
+            # input_ids: remove last non-padding token
             input_ids = full_input_ids[:last_non_padding_idx]
-            # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-            # 即：[BOS, token3, token4, ..., last_token]
+            # label: remove first token after BOS token, keep BOS, remove second token
+            # i.e.: [BOS, token3, token4, ..., last_token]
             label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
             
-            # 4. 使用新tokenizer生成的attention_mask，与IOIDatasetWrapper保持一致
+            # 4. Use attention_mask generated by new tokenizer, consistent with IOIDatasetWrapper
             attention_mask = full_attention_mask[:last_non_padding_idx]
             
-            # 直接padding到固定长度
-            max_len = 600  # 可以根据需要调整
+            # Directly pad to fixed length
+            max_len = 600  # Can be adjusted as needed
             pad_token_id = self.target_tokenizer.pad_token_id if self.target_tokenizer.pad_token_id is not None else 0
             
             # Padding input_ids
             input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
             
-            # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
+            # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
             label_padded = label.tolist() + [-100] * (max_len - len(label))
             
             # Padding attention_mask
             attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))
             
-            # 将padding后的数据存储
+            # Store padded data
             self.converted_data.append({
                 "input_ids": torch.tensor(input_ids_padded),
                 "attention_mask": torch.tensor(attention_mask_padded),
@@ -169,38 +169,38 @@ class InductionDatasetWrapper:
         return self.length
     
     def __getitem__(self, idx):
-        # 直接返回已经padding好的数据
+        # Directly return already padded data
         return self.converted_data[idx]
     
     def select(self, indices):
         """
-        添加select方法以支持UnlearnDataset的build_unlearn_dataset方法
+        Add select method to support UnlearnDataset's build_unlearn_dataset method
         """
         new_wrapper = InductionDatasetWrapper.__new__(InductionDatasetWrapper)
         new_wrapper.induction_dataset = self.induction_dataset
         new_wrapper.target_tokenizer = self.target_tokenizer
         new_wrapper.length = len(indices)
-        # 直接复制原始数据，让__getitem__方法处理padding
+        # Directly copy original data, let __getitem__ method handle padding
         new_wrapper.converted_data = [self.converted_data[i] for i in indices]
         return new_wrapper
 
-# Docstring数据集包装器，用于将docstring数据集转换为与其他数据集兼容的格式
+# Docstring dataset wrapper for converting docstring dataset to format compatible with other datasets
 class DocstingDatasetWrapper:
     def __init__(self, docstring_data, target_tokenizer):
         self.docstring_data = docstring_data
         self.target_tokenizer = target_tokenizer
         self.length = len(docstring_data)
         
-        # 转换数据
+        # Convert data
         self.converted_data = []
         for i in range(self.length):
-            # 1. 构建原始文本：clean_prompt + correct_answers[0]
+            # 1. Build original text: clean_prompt + correct_answers[0]
             prompt_item = self.docstring_data[i]
             clean_prompt = prompt_item.clean_prompt
             correct_answer = prompt_item.correct_answers[0]
             original_text = clean_prompt + correct_answer
             
-            # 2. 使用目标tokenizer重新tokenize
+            # 2. Re-tokenize using target tokenizer
             tokenized = self.target_tokenizer(
                 original_text,
                 truncation=True,
@@ -210,36 +210,36 @@ class DocstingDatasetWrapper:
                 return_tensors="pt"
             )
             
-            # 3. 正确处理input_ids和label的对应关系
+            # 3. Correctly handle correspondence between input_ids and label
             full_input_ids = tokenized.input_ids[0]
             full_attention_mask = tokenized.attention_mask[0]
             
-            # 找到最后一个非padding token的位置
+            # Find position of last non-padding token
             last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
             
-            # input_ids: 去掉最后一个非padding token
+            # input_ids: remove last non-padding token
             input_ids = full_input_ids[:last_non_padding_idx]
-            # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-            # 即：[BOS, token3, token4, ..., last_token]
+            # label: remove first token after BOS token, keep BOS, remove second token
+            # i.e.: [BOS, token3, token4, ..., last_token]
             label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
             
-            # 4. 使用新tokenizer生成的attention_mask
+            # 4. Use attention_mask generated by new tokenizer
             attention_mask = full_attention_mask[:last_non_padding_idx]
             
-            # 直接padding到固定长度
-            max_len = 50  # 可以根据需要调整
+            # Directly pad to fixed length
+            max_len = 50  # Can be adjusted as needed
             pad_token_id = self.target_tokenizer.pad_token_id if self.target_tokenizer.pad_token_id is not None else 0
             
             # Padding input_ids
             input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
             
-            # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
+            # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
             label_padded = label.tolist() + [-100] * (max_len - len(label))
             
             # Padding attention_mask
             attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))
             
-            # 将padding后的数据存储
+            # Store padded data
             self.converted_data.append({
                 "input_ids": torch.tensor(input_ids_padded),
                 "attention_mask": torch.tensor(attention_mask_padded),
@@ -250,36 +250,36 @@ class DocstingDatasetWrapper:
         return self.length
     
     def __getitem__(self, idx):
-        # 直接返回已经padding好的数据
+        # Directly return already padded data
         return self.converted_data[idx]
     
     def select(self, indices):
         """
-        添加select方法以支持UnlearnDataset的build_unlearn_dataset方法
+        Add select method to support UnlearnDataset's build_unlearn_dataset method
         """
         new_wrapper = DocstingDatasetWrapper.__new__(DocstingDatasetWrapper)
         new_wrapper.docstring_data = self.docstring_data
         new_wrapper.target_tokenizer = self.target_tokenizer
         new_wrapper.length = len(indices)
-        # 直接复制原始数据，让__getitem__方法处理padding
+        # Directly copy original data, let __getitem__ method handle padding
         new_wrapper.converted_data = [self.converted_data[i] for i in indices]
         return new_wrapper
 
-# Gender数据集包装器，用于将gender数据集转换为与其他数据集兼容的格式
+# Gender dataset wrapper for converting gender dataset to format compatible with other datasets
 class GenderDatasetWrapper:
     def __init__(self, gender_data, target_tokenizer):
         self.gender_data = gender_data
         self.target_tokenizer = target_tokenizer
         self.length = len(gender_data)
         
-        # 转换数据
+        # Convert data
         self.converted_data = []
         for i in range(self.length):
-            # 1. 构建输入样本：prefix + 空格 + pronoun + "?" + 换行 + corr_prefix + 空格 + corr_pronoun
+            # 1. Build input sample: prefix + space + pronoun + "?" + newline + corr_prefix + space + corr_pronoun
             data_item = self.gender_data[i]
             original_text = f"{data_item['prefix']}" " " f"{data_item['pronoun']}"
             
-            # 2. 使用目标tokenizer重新tokenize
+            # 2. Re-tokenize using target tokenizer
             tokenized = self.target_tokenizer(
                 original_text,
                 truncation=True,
@@ -289,36 +289,36 @@ class GenderDatasetWrapper:
                 return_tensors="pt"
             )
             
-            # 3. 正确处理input_ids和label的对应关系
+            # 3. Correctly handle correspondence between input_ids and label
             full_input_ids = tokenized.input_ids[0]
             full_attention_mask = tokenized.attention_mask[0]
             
-            # 找到最后一个非padding token的位置
+            # Find position of last non-padding token
             last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
             
-            # input_ids: 去掉最后一个非padding token
+            # input_ids: remove last non-padding token
             input_ids = full_input_ids[:last_non_padding_idx]
-            # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-            # 即：[BOS, token3, token4, ..., last_token]
+            # label: remove first token after BOS token, keep BOS, remove second token
+            # i.e.: [BOS, token3, token4, ..., last_token]
             label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
             
-            # 4. 使用新tokenizer生成的attention_mask
+            # 4. Use attention_mask generated by new tokenizer
             attention_mask = full_attention_mask[:last_non_padding_idx]
             
-            # 直接padding到固定长度
-            max_len = 50  # 可以根据需要调整
+            # Directly pad to fixed length
+            max_len = 50  # Can be adjusted as needed
             pad_token_id = self.target_tokenizer.pad_token_id if self.target_tokenizer.pad_token_id is not None else 0
             
             # Padding input_ids
             input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
             
-            # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
+            # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
             label_padded = label.tolist() + [-100] * (max_len - len(label))
             
             # Padding attention_mask
             attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))
             
-            # 将padding后的数据存储
+            # Store padded data
             self.converted_data.append({
                 "input_ids": torch.tensor(input_ids_padded),
                 "attention_mask": torch.tensor(attention_mask_padded),
@@ -329,32 +329,32 @@ class GenderDatasetWrapper:
         return self.length
     
     def __getitem__(self, idx):
-        # 直接返回已经padding好的数据
+        # Directly return already padded data
         return self.converted_data[idx]
     
     def select(self, indices):
         """
-        添加select方法以支持UnlearnDataset的build_unlearn_dataset方法
+        Add select method to support UnlearnDataset's build_unlearn_dataset method
         """
         new_wrapper = GenderDatasetWrapper.__new__(GenderDatasetWrapper)
         new_wrapper.gender_data = self.gender_data
         new_wrapper.target_tokenizer = self.target_tokenizer
         new_wrapper.length = len(indices)
-        # 直接复制原始数据，让__getitem__方法处理padding
+        # Directly copy original data, let __getitem__ method handle padding
         new_wrapper.converted_data = [self.converted_data[i] for i in indices]
         return new_wrapper
 
-# Bool数据集包装器，用于将gender数据集转换为与其他数据集兼容的格式
+# Bool dataset wrapper for converting bool dataset to format compatible with other datasets
 class BoolDatasetWrapper:
     def __init__(self, bool_data, target_tokenizer):
         self.bool_data = bool_data
         self.target_tokenizer = target_tokenizer
         self.length = len(bool_data)
         
-        # 转换数据
+        # Convert data
         self.converted_data = []
         for i in range(self.length):
-            # 1. 构建输入样本：prefix + 空格 + pronoun + "." + 换行 + corr_prefix + 空格 + corr_pronoun
+            # 1. Build input sample: prefix + space + pronoun + "." + newline + corr_prefix + space + corr_pronoun
             data_item = self.bool_data[i]
             ip = data_item["input"]
             ip = ip[:ip.rfind(" is")]
@@ -362,7 +362,7 @@ class BoolDatasetWrapper:
                 f"{ip} [/INST] "+f"{data_item['target']}"
             #original_text = f"{data_item['input']} {data_item['target']}.\n {data_item['corr_input']} {data_item['corr_target']}"
             
-            # 2. 使用目标tokenizer重新tokenize
+            # 2. Re-tokenize using target tokenizer
             tokenized = self.target_tokenizer(
                 original_text,
                 truncation=True,
@@ -372,36 +372,36 @@ class BoolDatasetWrapper:
                 return_tensors="pt"
             )
             
-            # 3. 正确处理input_ids和label的对应关系
+            # 3. Correctly handle correspondence between input_ids and label
             full_input_ids = tokenized.input_ids[0]
             full_attention_mask = tokenized.attention_mask[0]
             
-            # 找到最后一个非padding token的位置
+            # Find position of last non-padding token
             last_non_padding_idx = (full_attention_mask == 1).nonzero()[-1].item()
             
-            # input_ids: 去掉最后一个非padding token
+            # input_ids: remove last non-padding token
             input_ids = full_input_ids[:last_non_padding_idx]
-            # label: 去掉BOS token之后的第一个token，保留BOS，去掉第二个token
-            # 即：[BOS, token3, token4, ..., last_token]
+            # label: remove first token after BOS token, keep BOS, remove second token
+            # i.e.: [BOS, token3, token4, ..., last_token]
             label = torch.cat([full_input_ids[:1], full_input_ids[2:last_non_padding_idx + 1]])
             
-            # 4. 使用新tokenizer生成的attention_mask
+            # 4. Use attention_mask generated by new tokenizer
             attention_mask = full_attention_mask[:last_non_padding_idx]
             
-            # 直接padding到固定长度
-            max_len = 100  # 可以根据需要调整
+            # Directly pad to fixed length
+            max_len = 100  # Can be adjusted as needed
             pad_token_id = self.target_tokenizer.pad_token_id if self.target_tokenizer.pad_token_id is not None else 0
             
             # Padding input_ids
             input_ids_padded = input_ids.tolist() + [pad_token_id] * (max_len - len(input_ids))
             
-            # Padding label (使用-100作为padding，因为-100在损失计算中会被忽略)
+            # Padding label (use -100 as padding, as -100 is ignored in loss calculation)
             label_padded = label.tolist() + [-100] * (max_len - len(label))
             
             # Padding attention_mask
             attention_mask_padded = attention_mask.tolist() + [0] * (max_len - len(attention_mask))
             
-            # 将padding后的数据存储
+            # Store padded data
             self.converted_data.append({
                 "input_ids": torch.tensor(input_ids_padded),
                 "attention_mask": torch.tensor(attention_mask_padded),
@@ -412,18 +412,18 @@ class BoolDatasetWrapper:
         return self.length
     
     def __getitem__(self, idx):
-        # 直接返回已经padding好的数据
+        # Directly return already padded data
         return self.converted_data[idx]
     
     def select(self, indices):
         """
-        添加select方法以支持UnlearnDataset的build_unlearn_dataset方法
+        Add select method to support UnlearnDataset's build_unlearn_dataset method
         """
         new_wrapper = GenderDatasetWrapper.__new__(GenderDatasetWrapper)
         new_wrapper.bool_data = self.bool_data
         new_wrapper.target_tokenizer = self.target_tokenizer
         new_wrapper.length = len(indices)
-        # 直接复制原始数据，让__getitem__方法处理padding
+        # Directly copy original data, let __getitem__ method handle padding
         new_wrapper.converted_data = [self.converted_data[i] for i in indices]
         return new_wrapper
 
@@ -496,17 +496,17 @@ def get_dataset(
         forget_dataset = dataset["train"]
         test_dataset = dataset["test"]
     elif dataset_names["forget"] == "IOI":
-        # 创建IOI数据集作为forget数据集，使用GPT-2 tokenizer生成数据
+        # Create IOI dataset as forget dataset, use GPT-2 tokenizer to generate data
         ioi_dataset = IOIDataset(
             prompt_type="ABBA",
             N=200,
             nb_templates=1,
             seed=dataset_seed,
-            tokenizer=None,  # 使用默认的GPT-2 tokenizer
+            tokenizer=None,  # Use default GPT-2 tokenizer
         )
         
         forget_dataset = IOIDatasetWrapper(ioi_dataset, tokenizer)
-        test_dataset = IOIDatasetWrapper(ioi_dataset, tokenizer)  # 使用相同的数据集作为测试集
+        test_dataset = IOIDatasetWrapper(ioi_dataset, tokenizer)  # Use same dataset as test set
     elif "forget" not in dataset_names:
         forget_dataset = None
         test_dataset = None
@@ -517,7 +517,7 @@ def get_dataset(
     retain_datasets = {}
     test_datasets = {}
     
-    # 检查retain是否是列表（多个数据集）
+    # Check if retain is a list (multiple datasets)
     if isinstance(dataset_names["retain"], list):
         retain_dataset_names = dataset_names["retain"]
     else:
@@ -571,20 +571,20 @@ def get_dataset(
             retain_datasets[f"retain{i+1}"] = dataset["train"]
             test_datasets[f"test{i+1}"] = dataset["test"]
         elif retain_name == "IOI":
-            # 创建IOI数据集，使用GPT-2 tokenizer生成数据
+            # Create IOI dataset, use GPT-2 tokenizer to generate data
             ioi_dataset = IOIDataset(
                 prompt_type="ABBA",
                 N=2400,
                 nb_templates=1,
                 seed=dataset_seed,
-                tokenizer=None,  # 使用默认的GPT-2 tokenizer
+                tokenizer=None,  # Use default GPT-2 tokenizer
             )
             ioi_dataset_test=IOIDataset(
                 prompt_type="ABBA",
                 N=600,
                 nb_templates=1,
                 seed=dataset_seed,
-                tokenizer=None,  # 使用默认的GPT-2 tokenizer
+                tokenizer=None,  # Use default GPT-2 tokenizer
             )
             
             retain_datasets[f"retain{i+1}"] = IOIDatasetWrapper(ioi_dataset, tokenizer)
@@ -605,7 +605,7 @@ def get_dataset(
             docstring_induction_prompt_generator("rest", **docstring_ind_prompt_kwargs, seed=j)
             for j in range(3000)
         ]
-            # 划分数据：前800个作为validation_data，后200个作为test_data
+            # Split data: first 2400 as validation_data, last 600 as test_data
             validation_data = raw_prompts[:2400]
             test_data = raw_prompts[2400:3000]
             retain_datasets[f"retain{i+1}"] = DocstingDatasetWrapper(validation_data, tokenizer)
@@ -628,12 +628,12 @@ def get_dataset(
         else:
             raise ValueError(f"No dataset: {retain_name}")
 
-    # 如果没有retain数据集，设置为None
+    # If no retain datasets, set to None
     if not retain_datasets:
         retain_datasets = {"retain": None}
         test_datasets = {"test": None}
     elif len(retain_datasets) == 1:
-        # 如果是单个retain数据集，使用"retain"键名以保持向后兼容性
+        # If single retain dataset, use "retain" key name to maintain backward compatibility
         single_retain_key = list(retain_datasets.keys())[0]
         single_test_key = list(test_datasets.keys())[0]
         retain_datasets = {"retain": retain_datasets[single_retain_key]}
@@ -643,14 +643,14 @@ def get_dataset(
     downstream_datasets = {}
     downstream_dataset_names = ["induction", "IOI", "bool", "gender", "docstring","winogrande","sst2"]
     
-    # 获取所有retain数据集名称（包括多个数据集的情况）
+    # Get all retain dataset names (including multiple datasets)
     all_retain_names = []
     if isinstance(dataset_names["retain"], list):
         all_retain_names = dataset_names["retain"]
     else:
         all_retain_names = [dataset_names["retain"]]
     
-    # 为每个不在retain中的downstream数据集创建test_data
+    # Create test_data for each downstream dataset not in retain
     for downstream_name in downstream_dataset_names:
         if downstream_name not in all_retain_names:
             if downstream_name == "induction":
@@ -712,7 +712,7 @@ if __name__ == "__main__":
     )
     print(len(unlearn_dataset))
 
-    print(f"测试数据集数量: {len(test_datasets)}")
+    print(f"Number of test datasets: {len(test_datasets)}")
     for key, dataset in test_datasets.items():
         if dataset is not None:
             print(f"{key}: {len(dataset)}")

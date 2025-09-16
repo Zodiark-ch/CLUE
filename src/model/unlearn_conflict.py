@@ -22,13 +22,13 @@ from metrics.simple_accuracy import eval_acc
 from optim import create_sophia_optimizer
 from unlearn import GenerateMask, get_unlearn_method
 
-#os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
 class Unlearn:
     def __init__(self, model_name, cache_dir, **kwargs) -> None:
         self.model_name = model_name
         self.cache_dir = cache_dir
         
-        # 冲突学习参数
+        # Conflict learning parameters
         self.safe_unlearn_method = kwargs["safe_unlearn_method"]
         self.conflict_unlearn_method = kwargs["conflict_unlearn_method"]
         self.safe_mask_path = kwargs["safe_mask_path"]
@@ -45,7 +45,7 @@ class Unlearn:
         self.lr = kwargs["lr"]
         self.gradient_accumulation_steps = kwargs["gradient_accumulation_steps"]
         self.weight_decay = kwargs["weight_decay"]
-        self.max_grad_norm = kwargs.get("max_grad_norm", 1.0)  # 添加梯度裁剪参数
+        self.max_grad_norm = kwargs.get("max_grad_norm", 1.0)  # Add gradient clipping parameter
         self.alpha = kwargs.get("alpha", None)
         self.gamma = kwargs.get("gamma", None)
         self.task_name = kwargs.get("task_name", None)
@@ -65,12 +65,12 @@ class Unlearn:
         self.mu = kwargs.get("mu", 1e-3)
     
     def _move_mask_to_device(self, mask, if_wanda, mask_name):
-        """将mask移动到正确的设备上"""
+        """Move mask to correct device"""
         if mask is None:
             return
         
-        # 直接使用wanda类型的处理方式（数字索引作为键）
-        print(f"处理{mask_name} mask，使用数字索引作为键")
+        # Directly use wanda-type processing (using numeric indices as keys)
+        print(f"Processing {mask_name} mask, using numeric indices as keys")
         try:
             layers = self.model.model.layers
         except:
@@ -107,14 +107,14 @@ class Unlearn:
         tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=False)
 
         if tokenizer.pad_token_id is None:
-            if self.if_llama:#如果是llama系列的话用pad，不是的话用eos（这个还得看具体的模型）
+            if self.if_llama:# If llama series use pad, otherwise use eos (depends on specific model)
                 tokenizer.add_special_tokens({"pad_token": "[pad]"})
 
             else:
                 tokenizer.pad_token = tokenizer.eos_token
                 model.config.pad_token_id = model.config.eos_token_id
         self.model = model
-        self.model.resize_token_embeddings(len(tokenizer))#因为添加了pad，所以需要保证embedding大小和tokenizer大小相同
+        self.model.resize_token_embeddings(len(tokenizer))# Because pad was added, need to ensure embedding size matches tokenizer size
         self.tokenizer = tokenizer
         # if torch.cuda.device_count() > 1:
         #     print("Using", torch.cuda.device_count(), "GPUs for DataParallel!")
@@ -154,11 +154,11 @@ class Unlearn:
         root = logger.get_root()
         unlearn_checkpoint = f"{root}/unlearn_checkpoint"
         
-        # 冲突学习模式：创建两个unlearner
+        # Conflict learning mode: create two unlearners
         self._init_conflict_unlearners(logger)
     
     def _init_conflict_unlearners(self, logger):
-        """初始化冲突学习的两个unlearner"""
+        """Initialize two unlearners for conflict learning"""
         root = logger.get_root()
         unlearn_checkpoint = f"{root}/unlearn_checkpoint"
         
@@ -182,7 +182,7 @@ class Unlearn:
             report_to=[], 
         )
         
-        # 创建safe unlearner
+        # Create safe unlearner
         if self.optimizer is not None:
             self.safe_unlearner = get_unlearn_method(
                 name=self.safe_unlearn_method,
@@ -217,7 +217,7 @@ class Unlearn:
                 if_wanda=True,
             )
         
-        # 创建conflict unlearner
+        # Create conflict unlearner
         if self.optimizer is not None:
             self.conflict_unlearner = get_unlearn_method(
                 name=self.conflict_unlearn_method,
@@ -253,38 +253,38 @@ class Unlearn:
             )
 
     def init_mask(self, logger):
-        # 初始化两个mask
+        # Initialize two masks
         self.safe_mask = None
         self.conflict_mask = None
         
-        # 加载safe mask /data/zodiark/CSAT/conflict/safe_mask.pt
+        # Load safe mask /data/zodiark/CSAT/conflict/safe_mask.pt
         if self.safe_mask_path is not None and os.path.exists(self.safe_mask_path):
-            print(f"加载safe mask: {self.safe_mask_path}")
+            print(f"Loading safe mask: {self.safe_mask_path}")
             self.safe_mask = torch.load(self.safe_mask_path)
             self._move_mask_to_device(self.safe_mask, None, "safe")
         
-        # 加载conflict mask
+        # Load conflict mask
         if self.conflict_mask_path is not None and os.path.exists(self.conflict_mask_path):
-            print(f"加载conflict mask: {self.conflict_mask_path}")
+            print(f"Loading conflict mask: {self.conflict_mask_path}")
             self.conflict_mask = torch.load(self.conflict_mask_path)
             self._move_mask_to_device(self.conflict_mask, None, "conflict")
         
-        # 设置默认mask为safe_mask
+        # Set default mask to safe_mask
         if self.safe_mask is not None:
             self.mask = self.safe_mask
         else:
             self.mask = None
             
-        # 如果safe mask文件不存在，需要生成
+        # If safe mask file does not exist, need to generate
         if self.safe_mask_path is not None and not os.path.exists(self.safe_mask_path):
             self._generate_mask(self.safe_mask_path, logger, "safe")
         
-        # 如果conflict mask文件不存在，需要生成
+        # If conflict mask file does not exist, need to generate
         if self.conflict_mask_path is not None and not os.path.exists(self.conflict_mask_path):
             self._generate_mask(self.conflict_mask_path, logger, "conflict")
     
     def _generate_mask(self, mask_path, logger, mask_name):
-        """生成mask文件"""
+        """Generate mask file"""
         parts = mask_path.split("/")
         score_type = parts[-2]
         if score_type == "wanda":
@@ -363,7 +363,7 @@ class Unlearn:
             os.system(f"rm -rf {mask_path}")
             return
         
-        # 保存生成的mask
+        # Save generated mask
         torch.save(mask, mask_path)
         print(f"Generated {mask_name} mask saved to {mask_path}")
     def init_optimizer(self):
@@ -376,7 +376,7 @@ class Unlearn:
                 weight_decay=self.weight_decay,
             )
         else:
-            # 创建标准的AdamW优化器
+            # Create standard AdamW optimizer
             from torch.optim import AdamW
             self.optimizer = AdamW(
                 self.model.parameters(),
@@ -389,95 +389,95 @@ class Unlearn:
         torch.cuda.empty_cache()
         root = logger.get_root()
         
-        # 确保根目录存在
+        # Ensure root directory exists
         import os
         os.makedirs(root, exist_ok=True)
         
         if self.resume_path is not None:
             model_name = self.resume_path
         else:
-            # 使用 checkpoints 路径，这是保存微调后模型的地方
+            # Use checkpoints path, this is where fine-tuned models are saved
             model_name = os.path.join(root, "checkpoints")
         if self.task_name == "downstream":
             if "WMDP" in self.dataset_names["forget"]:
-                print("开始评估wmdp数据集...")
+                print("Starting evaluation of wmdp dataset...")
                 eval_few_shots(model_name=model_name, task_list=["wmdp"], output_path=f"{root}/wmdp.json")
                 torch.cuda.empty_cache()
                 eval_few_shots(model_name=model_name,  task_list=["mmlu"],output_path=f"{root}/mmlu.json")
             torch.cuda.empty_cache()
             if self.dataset_names["forget"] == "SafePku":
-                print("开始评估DETOX数据集...")
+                print("Starting evaluation of DETOX dataset...")
                 eval_toxic(
                     model_name=model_name, output_dir=root, dataset=self.unlearn_dataset
                 )
             torch.cuda.empty_cache()
-            # 处理多个test数据集的情况
+            # Handle multiple test datasets
             if isinstance(self.test_datasets, dict) and len(self.test_datasets) > 1:
-                # 多个test数据集
+                # Multiple test datasets
                 data_num=0
                 for test_key, test_dataset in self.test_datasets.items():
                     if test_dataset is not None:
-                        print(f"评估数据集: {self.dataset_names['retain'][data_num]}")
+                        print(f"Evaluating dataset: {self.dataset_names['retain'][data_num]}")
                         data_num+=1
-                        # 确保每个test数据集的输出目录存在
+                        # Ensure output directory exists for each test dataset
                         test_output_dir = f"{root}/{test_key}"
                         os.makedirs(test_output_dir, exist_ok=True)
                         eval_acc(model_name=model_name, retain_dataset=test_dataset, output_dir=test_output_dir, batch_size=8)
                         torch.cuda.empty_cache()
             else:
-                # 单个test数据集（向后兼容）
+                # Single test dataset (backward compatibility)
                 if isinstance(self.test_datasets, dict):
-                    # 单个test数据集，键为"test"
+                    # Single test dataset, key is "test"
                     test_dataset = self.test_datasets.get("test")
                 else:
-                    # 直接是数据集对象
+                    # Directly a dataset object
                     test_dataset = self.test_datasets
                 
                 if test_dataset is not None:
                     eval_acc(model_name=model_name, retain_dataset=test_dataset, output_dir=root, batch_size=8)
                     torch.cuda.empty_cache()
             
-            # 评估downstream数据集
+            # Evaluate downstream datasets
             if self.downstream_datasets and len(self.downstream_datasets) > 0:
-                print("开始评估downstream数据集...")
+                print("Starting evaluation of downstream datasets...")
                 for downstream_key, downstream_dataset in self.downstream_datasets.items():
                     if downstream_dataset is not None:
-                        # 提取数据集名称（去掉"downstream_"前缀）
+                        # Extract dataset name (remove "downstream_" prefix)
                         dataset_name = downstream_key.replace("downstream_", "")
-                        print(f"评估downstream数据集: {dataset_name}")
+                        print(f"Evaluating downstream dataset: {dataset_name}")
                         
-                        # 确保downstream数据集的输出目录存在
+                        # Ensure output directory exists for downstream dataset
                         downstream_output_dir = f"{root}/downstream_{dataset_name}"
                         os.makedirs(downstream_output_dir, exist_ok=True)
                         
                         eval_acc(model_name=model_name, retain_dataset=downstream_dataset, output_dir=downstream_output_dir, batch_size=8)
                         torch.cuda.empty_cache()
-            # 执行eval_ppl
+            # Execute eval_ppl
             #eval_ppl(model_name=model_name, output_path=f"{root}/ppl.json")
-            # 添加准确率评估
+            # Add accuracy evaluation
             eval_few_shots(model_name=model_name, output_path=f"{root}/few_shots.json")
             torch.cuda.empty_cache()
 
     def eval_accuracy(self, model_name, output_dir=".", batch_size=8):
         """
-        评估模型在retain数据集上的准确率
+        Evaluate model accuracy on retain dataset
         
         Args:
-            model_name: 模型名称
-            output_dir: 输出目录
-            batch_size: 批次大小
+            model_name: Model name
+            output_dir: Output directory
+            batch_size: Batch size
         
         Returns:
-            accuracies: 准确率字典，键为数据集名称，值为准确率（百分比）
+            accuracies: Accuracy dictionary, key is dataset name, value is accuracy (percentage)
         """
         accuracies = {}
         
-        # 处理多个test数据集的情况
+        # Handle multiple test datasets
         if isinstance(self.test_datasets, dict):
-            # 多个test数据集
+            # Multiple test datasets
             for test_key, test_dataset in self.test_datasets.items():
                 if test_dataset is not None:
-                    print(f"评估数据集: {test_key}")
+                    print(f"Evaluating dataset: {test_key}")
                     accuracy = eval_acc(
                         model_name=model_name,
                         retain_dataset=test_dataset,
@@ -486,7 +486,7 @@ class Unlearn:
                     )
                     accuracies[test_key] = accuracy
         else:
-            # 单个test数据集（向后兼容）
+            # Single test dataset (backward compatibility)
             accuracy = eval_acc(
                 model_name=model_name,
                 retain_dataset=self.test_datasets,
@@ -509,7 +509,7 @@ class Unlearn:
             self.init_mask(logger)
             self.init_unlearner(logger)
             
-            # 运行冲突学习训练
+            # Run conflict learning training
             self._run_conflict_training(logger)
                     
             self.save(logger)
@@ -521,31 +521,31 @@ class Unlearn:
             self.eval(logger)
     
     def _run_conflict_training(self, logger):
-        """运行冲突学习训练"""
-        print(f"开始冲突学习训练，交替频率：{self.alternate_frequency} epochs")
+        """Run conflict learning training"""
+        print(f"Starting conflict learning training, alternate frequency: {self.alternate_frequency} epochs")
         print(f"Safe unlearn method: {self.safe_unlearn_method}")
         print(f"Conflict unlearn method: {self.conflict_unlearn_method}")
         
-        # 计算每个epoch的步数
+        # Calculate steps per epoch
         steps_per_epoch = len(self.unlearn_dataset) // (
             self.batch_size * self.gradient_accumulation_steps * self.num_devices
         )
         
-        # 创建自定义的训练循环
+        # Create custom training loop
         self._custom_conflict_training_loop(steps_per_epoch, logger)
     
     def _custom_conflict_training_loop(self, steps_per_epoch, logger):
-        """自定义冲突学习训练循环"""
+        """Custom conflict learning training loop"""
         self.model.train()
         
-        # 确保优化器已初始化
+        # Ensure optimizer is initialized
         if self.optimizer is None:
             self.init_optimizer()
         
-        # 计算总步数
+        # Calculate total steps
         total_steps = self.num_epochs * steps_per_epoch
         
-        # 创建数据加载器
+        # Create data loader
         train_dataloader = torch.utils.data.DataLoader(
             self.unlearn_dataset,
             batch_size=self.batch_size,
@@ -555,20 +555,20 @@ class Unlearn:
         
         current_step = 0
         
-        print(f"开始训练，总epoch数：{self.num_epochs}，每epoch步数：{steps_per_epoch}")
+        print(f"Starting training, total epochs: {self.num_epochs}, steps per epoch: {steps_per_epoch}")
         
         for epoch in range(self.num_epochs):
             print(f"Epoch {epoch + 1}/{self.num_epochs}")
             
-            # 决定当前epoch使用哪个unlearner
+            # Decide which unlearner to use for current epoch
             if epoch==0:
                 current_unlearner = self.safe_unlearner
                 current_method = self.safe_unlearn_method
-                print(f"使用 Safe unlearner: {current_method}")
+                print(f"Using Safe unlearner: {current_method}")
             else:
                 current_unlearner = self.conflict_unlearner
                 current_method = self.conflict_unlearn_method
-                print(f"使用 Conflict unlearner: {current_method}")
+                print(f"Using Conflict unlearner: {current_method}")
             
             epoch_loss = 0.0
             num_batches = 0
@@ -577,29 +577,29 @@ class Unlearn:
                 if current_step >= total_steps:
                     break
                 
-                # 将batch移动到设备
+                # Move batch to device
                 batch = {k: v.to(self.model.device) if hasattr(v, 'to') else v for k, v in batch.items()}
                 
-                # 计算损失
+                # Calculate loss
                 with torch.cuda.amp.autocast():
                     loss = current_unlearner.compute_loss(current_unlearner.model, batch)
                 
-                # 检查损失是否为NaN或无穷大
+                # Check if loss is NaN or infinite
                 if torch.isnan(loss) or torch.isinf(loss):
-                    print(f"警告：Batch {batch_idx} 损失为 {loss.item()}，跳过此批次")
+                    print(f"Warning: Batch {batch_idx} loss is {loss.item()}, skipping this batch")
                     continue
                 
-                # 反向传播
+                # Backward propagation
                 loss.backward()
                 
-                # 梯度裁剪 - 防止梯度爆炸
+                # Gradient clipping - prevent gradient explosion
                 if self.optimizer is not None:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.max_grad_norm)
                 
-                # 梯度累积
+                # Gradient accumulation
                 if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
                     if self.optimizer is not None:
-                        # 检查梯度是否为NaN
+                        # Check if gradients are NaN
                         has_nan_grad = False
                         for param in self.model.parameters():
                             if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
@@ -607,7 +607,7 @@ class Unlearn:
                                 break
                         
                         if has_nan_grad:
-                            print(f"警告：Batch {batch_idx} 梯度包含NaN，跳过此步骤")
+                            print(f"Warning: Batch {batch_idx} gradients contain NaN, skipping this step")
                             self.optimizer.zero_grad()
                         else:
                             self.optimizer.step()
@@ -617,18 +617,18 @@ class Unlearn:
                 epoch_loss += loss.item()
                 num_batches += 1
                 
-                # 打印进度
+                # Print progress
                 if batch_idx % 10 == 0:
                     print(f"  Batch {batch_idx}/{len(train_dataloader)}, Loss: {loss.item():.4f}")
             
             avg_epoch_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
-            print(f"Epoch {epoch + 1} 完成，平均损失: {avg_epoch_loss:.4f}")
+            print(f"Epoch {epoch + 1} completed, average loss: {avg_epoch_loss:.4f}")
             
-            # 保存检查点
+            # Save checkpoint
             if (epoch + 1) % 5 == 0:
                 self.save(logger)
         
-        print("冲突学习训练完成")
+        print("Conflict learning training completed")
 
 
 def get(**kwargs):

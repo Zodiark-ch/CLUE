@@ -10,7 +10,7 @@ class RL(BaseTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         forget_data = inputs["forget"]
-        # 获取第一个可用的retain数据集
+        # Get first available retain dataset
         retain_data = None
         for key, data in inputs.items():
             if key.startswith("retain") and data is not None:
@@ -18,7 +18,7 @@ class RL(BaseTrainer):
                 break
         
         if retain_data is None:
-            # 如果没有retain数据集，返回零损失
+            # If no retain dataset, return zero loss
             return torch.tensor(0.0, device=next(model.parameters()).device)
         
         labels = forget_data[2]

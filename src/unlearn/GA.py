@@ -42,7 +42,7 @@ class GA_FT(GA):
 
         forget_loss = -outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -58,7 +58,7 @@ class GA_FT(GA):
                 retain_loss += retain_outputs.loss
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = forget_loss + self.gamma * retain_loss
@@ -85,7 +85,7 @@ class GA_KL(GA):
 
         forget_loss = -outputs.loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -108,7 +108,7 @@ class GA_KL(GA):
                 retain_loss += kl_loss(prob_retain_p, prob_retain_q)
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
             loss = forget_loss + (1 - self.gamma) * retain_loss
@@ -167,7 +167,7 @@ class NPO_FT(BaseTrainer):
         
         neg_log_ratios = current_forget_loss - ref_forget_loss
 
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -183,7 +183,7 @@ class NPO_FT(BaseTrainer):
                 retain_loss += retain_outputs.loss
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             retain_loss = retain_loss / retain_count
         else:

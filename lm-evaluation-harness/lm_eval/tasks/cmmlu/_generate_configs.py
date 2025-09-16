@@ -14,10 +14,10 @@ eval_logger = logging.getLogger(__name__)
 
 
 SUBJECTS = {
-    "agronomy": "农学",
-    "anatomy": "解剖学",
-    "ancient_chinese": "古汉语",
-    "arts": "艺术学",
+    "agronomy": "Agronomy",
+    "anatomy": "Anatomy",
+    "ancient_chinese": "Ancient Chinese",
+    "arts": "Arts",
     "astronomy": "天文学",
     "business_ethics": "商业伦理",
     "chinese_civil_service_exam": "中国公务员考试",

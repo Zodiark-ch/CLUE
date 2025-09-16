@@ -9,7 +9,7 @@ class FT(BaseTrainer):
         super().__init__(*args, **kwargs)
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        # 处理多个retain数据集的情况
+        # Handle multiple retain datasets
         retain_loss = 0.0
         retain_count = 0
         
@@ -25,11 +25,11 @@ class FT(BaseTrainer):
                 retain_loss += outputs.loss
                 retain_count += 1
         
-        # 如果有retain数据集，计算平均损失
+        # If there are retain datasets, calculate average loss
         if retain_count > 0:
             loss = retain_loss / retain_count
         else:
-            # 如果没有retain数据集，返回零损失
+            # If no retain dataset, return zero loss
             loss = torch.tensor(0.0, device=next(model.parameters()).device)
 
         return (loss, outputs) if return_outputs else loss

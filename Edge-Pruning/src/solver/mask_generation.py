@@ -6,13 +6,13 @@ import sys
 
 def parse_args():
     """
-    解析命令行参数
+    Parse command line arguments
     Returns:
-        argparse.Namespace: 解析后的参数对象
+        argparse.Namespace: Parsed argument object
     """
     parser = argparse.ArgumentParser(description="Mask generation tool")
     
-    # mask path参数
+    # mask path parameters
     parser.add_argument(
         "-mask", "--mask_path", 
         type=str, 
@@ -20,7 +20,7 @@ def parse_args():
         help="Path to the mask pt file"
     )
     
-    # conflict node参数
+    # conflict node parameters
     parser.add_argument(
         "-conflict", "--conflict_node", 
         type=str, 
@@ -28,7 +28,7 @@ def parse_args():
         help="Path to the conflict node list JSON file"
     )
     
-    # false node参数
+    # false node parameters
     parser.add_argument(
         "-false", "--false_node", 
         type=str, 
@@ -36,7 +36,7 @@ def parse_args():
         help="Path to the false node list JSON file"
     )
     
-    # output参数
+    # output parameters
     parser.add_argument(
         "-output", "--output", 
         type=str, 
@@ -46,7 +46,7 @@ def parse_args():
     
     args = parser.parse_args()
     
-    # 如果output为空，设置为mask path所在的文件夹
+    # If output is empty, set to folder containing mask path
     if not args.output:
         args.output = os.path.dirname(args.mask_path)
     
@@ -54,79 +54,79 @@ def parse_args():
 
 def load_mask_file(mask_path):
     """
-    加载mask pt文件
+    Load mask pt file
     Args:
-        mask_path: mask文件的路径
+        mask_path: Path to mask file
     Returns:
-        torch.Tensor or dict: 加载的mask数据
+        torch.Tensor or dict: Loaded mask data
     """
     try:
-        print(f"正在加载mask文件: {mask_path}")
+        print(f"Loading mask file: {mask_path}")
         mask_data = torch.load(mask_path, map_location='cpu')
-        print(f"成功加载mask文件")
-        print(f"数据类型: {type(mask_data)}")
+        print(f"Successfully loaded mask file")
+        print(f"Data type: {type(mask_data)}")
         
         if isinstance(mask_data, torch.Tensor):
-            print(f"张量形状: {mask_data.shape}")
-            print(f"张量数据类型: {mask_data.dtype}")
+            print(f"Tensor shape: {mask_data.shape}")
+            print(f"Tensor data type: {mask_data.dtype}")
         elif isinstance(mask_data, dict):
-            print(f"字典键: {list(mask_data.keys())}")
+            print(f"Dictionary keys: {list(mask_data.keys())}")
             for key, value in mask_data.items():
                 if isinstance(value, torch.Tensor):
-                    print(f"  {key}: 形状 {value.shape}, 类型 {value.dtype}")
+                    print(f"  {key}: shape {value.shape}, type {value.dtype}")
                 else:
-                    print(f"  {key}: 类型 {type(value)}")
+                    print(f"  {key}: type {type(value)}")
         
         return mask_data
         
     except FileNotFoundError:
-        print(f"错误：找不到mask文件 {mask_path}")
+        print(f"Error: Cannot find mask file {mask_path}")
         return None
     except Exception as e:
-        print(f"加载mask文件时发生错误：{e}")
+        print(f"Error occurred while loading mask file: {e}")
         return None
 
 def load_node_lists(conflict_path, false_path):
     """
-    加载节点列表文件
+    Load node list files
     Args:
-        conflict_path: conflict node列表文件路径
-        false_path: false node列表文件路径
+        conflict_path: Path to conflict node list file
+        false_path: Path to false node list file
     Returns:
-        tuple: (conflict_nodes, false_nodes) 两个节点列表
+        tuple: (conflict_nodes, false_nodes) Two node lists
     """
     conflict_nodes = []
     false_nodes = []
     
-    # 加载conflict node列表
+    # Load conflict node list
     try:
         if os.path.exists(conflict_path):
             with open(conflict_path, 'r') as f:
                 conflict_nodes = json.load(f)
-            print(f"成功加载conflict node列表: {len(conflict_nodes)} 个节点")
+            print(f"Successfully loaded conflict node list: {len(conflict_nodes)} nodes")
         else:
-            print(f"警告：conflict node文件不存在: {conflict_path}")
+            print(f"Warning: conflict node file does not exist: {conflict_path}")
     except Exception as e:
-        print(f"加载conflict node文件时发生错误：{e}")
+        print(f"Error occurred while loading conflict node file: {e}")
     
-    # 加载false node列表
+    # Load false node list
     try:
         if os.path.exists(false_path):
             with open(false_path, 'r') as f:
                 false_nodes = json.load(f)
-            print(f"成功加载false node列表: {len(false_nodes)} 个节点")
+            print(f"Successfully loaded false node list: {len(false_nodes)} nodes")
         else:
-            print(f"警告：false node文件不存在: {false_path}")
+            print(f"Warning: false node file does not exist: {false_path}")
     except Exception as e:
-        print(f"加载false node文件时发生错误：{e}")
+        print(f"Error occurred while loading false node file: {e}")
     
     return conflict_nodes, false_nodes
 
 def count_true_false_percentage(data):
     """
-    统计数据中True和False的百分比
+    Count the percentage of True and False in data
     Args:
-        data: 要统计的数据（可以是Tensor或dict）
+        data: Data to be counted (can be Tensor or dict)
     Returns:
         tuple: (true_count, false_count, total_count, true_percentage, false_percentage)
     """
@@ -135,12 +135,12 @@ def count_true_false_percentage(data):
     total_count = 0
     
     if isinstance(data, torch.Tensor):
-        # 如果是张量，直接统计
+        # If it's a tensor, count directly
         true_count = torch.sum(data == True).item()
         false_count = torch.sum(data == False).item()
         total_count = data.numel()
     elif isinstance(data, dict):
-        # 如果是字典，遍历所有值
+        # If it's a dictionary, iterate through all values
         for key, value in data.items():
             if isinstance(value, torch.Tensor):
                 true_count += torch.sum(value == True).item()
@@ -153,10 +153,10 @@ def count_true_false_percentage(data):
                     false_count += 1
                 total_count += 1
     else:
-        print(f"警告：不支持的数据类型 {type(data)}")
+        print(f"Warning: Unsupported data type {type(data)}")
         return 0, 0, 0, 0.0, 0.0
     
-    # 计算百分比
+    # Calculate percentage
     true_percentage = (true_count / total_count * 100) if total_count > 0 else 0.0
     false_percentage = (false_count / total_count * 100) if total_count > 0 else 0.0
     
@@ -164,15 +164,15 @@ def count_true_false_percentage(data):
 
 def create_mask_structure(mask_data):
     """
-    创建与mask_data相同结构的mask
+    Create a mask with the same structure as mask_data
     Args:
-        mask_data: 原始mask数据，用于获取结构
+        mask_data: Original mask data, used to get structure
     Returns:
-        dict: 与mask_data相同结构的mask，初始值为False
+        dict: Mask with the same structure as mask_data, initial value is False
     """
     mask_structure =mask_data.copy()
     mask_structure_ture={}
-    # 复制mask_data的结构，但所有值设为False
+    # Copy the structure of mask_data, but set all values to False
     for key, tensor in mask_data.items():
         #mask_structure[key] = torch.zeros_like(tensor, dtype=torch.bool)
         mask_structure_ture[key] = torch.ones_like(tensor, dtype=torch.bool)
@@ -181,25 +181,25 @@ def create_mask_structure(mask_data):
 
 def parse_node_name(node_name):
     """
-    解析节点名称，映射到0-224的key
+    Parse node name and map to key 0-224
     Args:
-        node_name: 节点名称字符串
+        node_name: Node name string
     Returns:
-        dict: 解析结果，包含key, param_type, slice_info等信息
+        dict: Parse result, containing key, param_type, slice_info and other information
     """
     if node_name.startswith('m'):
-        # 处理'm'开头的节点
+        # Handle nodes starting with 'm'
         try:
-            # 找到第一个'.'的位置，如果没有'.'则取整个字符串
+            # Find the position of the first '.', if there's no '.' then take the entire string
             dot_pos = node_name.find('.')
             if dot_pos == -1:
-                layer_str = node_name[1:]  # 取'm'后面的所有字符
+                layer_str = node_name[1:]  # Take all characters after 'm'
             else:
-                layer_str = node_name[1:dot_pos]  # 取'm'后面到第一个'.'之前的所有字符
+                layer_str = node_name[1:dot_pos]  # Take all characters from after 'm' to before the first '.'
             
             layer_num = int(layer_str)
             
-            # 计算对应的key：每层7个参数，gate, up, down分别对应key 4, 5, 6
+            # Calculate corresponding key: 7 parameters per layer, gate, up, down correspond to keys 4, 5, 6 respectively
             base_key = layer_num * 7
             keys = [base_key + 4, base_key + 5, base_key + 6]  # gate, up, down
             
@@ -207,47 +207,47 @@ def parse_node_name(node_name):
                 'type': 'm',
                 'layer': layer_num,
                 'keys': keys,
-                'param_type': ['gate', 'up', 'down']  # 影响三个参数
+                'param_type': ['gate', 'up', 'down']  # Affects three parameters
             }
         except (ValueError, IndexError):
-            print(f"警告：无法解析节点名称 {node_name}")
+            print(f"Warning: Cannot parse node name {node_name}")
             return None
     
     elif node_name.startswith('a'):
-        # 处理'a'开头的节点
+        # Handle nodes starting with 'a'
         try:
             parts = node_name.split('.')
             if len(parts) != 3:
-                print(f"警告：节点名称格式错误 {node_name}")
+                print(f"Warning: Node name format error {node_name}")
                 return None
             
-            # 解析层数 - 取'a'后面的所有字符
-            layer_str = parts[0][1:]  # 去掉'a'，取后面所有字符
+            # Parse layer number - take all characters after 'a'
+            layer_str = parts[0][1:]  # Remove 'a', take all characters after
             layer_num = int(layer_str)
             
-            # 解析h/H部分 - 取'h'或'H'后面的所有字符
+            # Parse h/H part - take all characters after 'h' or 'H'
             h_part = parts[1]
             if h_part.startswith('h'):
-                h_num = int(h_part[1:])  # 取'h'后面的所有字符
+                h_num = int(h_part[1:])  # Take all characters after 'h'
                 slice_start = h_num * 128
                 slice_end = slice_start + 128
                 slice_info = (slice_start, slice_end)
             elif h_part.startswith('H'):
-                h_num = int(h_part[1:])  # 取'H'后面的所有字符
+                h_num = int(h_part[1:])  # Take all characters after 'H'
                 slice_start = h_num * 128
                 slice_end = slice_start + 128
                 slice_info = (slice_start, slice_end)
             else:
-                print(f"警告：无法解析h/H部分 {h_part}")
+                print(f"Warning: Cannot parse h/H part {h_part}")
                 return None
             
-            # 解析参数类型
+            # Parse parameter type
             param_type = parts[2]
             if param_type not in ['q', 'k', 'v', 'o']:
-                print(f"警告：未知的参数类型 {param_type}")
+                print(f"Warning: Unknown parameter type {param_type}")
                 return None
             
-            # 计算对应的key：每层7个参数，q,k,v,o分别对应key 0,1,2,3
+            # Calculate corresponding key: 7 parameters per layer, q,k,v,o correspond to keys 0,1,2,3 respectively
             param_to_key = {'q': 0, 'k': 1, 'v': 2, 'o': 3}
             key = layer_num * 7 + param_to_key[param_type]
             
@@ -261,47 +261,47 @@ def parse_node_name(node_name):
             }
             
         except (ValueError, IndexError) as e:
-            print(f"警告：解析节点名称 {node_name} 时出错: {e}")
+            print(f"Warning: Error parsing node name {node_name}: {e}")
             return None
     
     else:
-        print(f"警告：不支持的节点名称格式 {node_name}")
+        print(f"Warning: Unsupported node name format {node_name}")
         return None
 
 def apply_node_to_mask(mask_structure, node_name, mask_data):
     """
-    将节点应用到mask结构
+    Apply node to mask structure
     Args:
-        mask_structure: mask数据结构
-        node_name: 节点名称
-        mask_data: 原始mask数据
+        mask_structure: Mask data structure
+        node_name: Node name
+        mask_data: Original mask data
     """
     parsed = parse_node_name(node_name)
     if parsed is None:
         return
     
     if parsed['type'] == 'm':
-        # 对第N层的gate, up, down参数，将mask_data中对应的值复制过来
+        # For gate, up, down parameters of layer N, copy corresponding values from mask_data
         for key in parsed['keys']:
             key_str = int(key)
             mask_structure[key_str] = mask_data[key_str].clone()
-            print(f"  复制 key {key_str} (层{parsed['layer']}的{parsed['param_type'][parsed['keys'].index(key)]}) 从mask_data (m类型)")
+            print(f"  Copy key {key_str} (layer {parsed['layer']} {parsed['param_type'][parsed['keys'].index(key)]}) from mask_data (m type)")
     
     elif parsed['type'] == 'a':
-        # 对特定参数矩阵的特定切片，将mask_data中对应的值复制过来
+        # For specific slices of specific parameter matrices, copy corresponding values from mask_data
         key_str = int(parsed['key'])
         slice_start, slice_end = parsed['slice_info']
         
-        # 复制mask_data中对应切片的值为True
+        # Copy values from corresponding slices in mask_data as True
         mask_structure[key_str][slice_start:slice_end, :] = mask_data[key_str][slice_start:slice_end, :]
-        print(f"  复制 key {key_str} (层{parsed['layer']}的{parsed['param_type']}) [{slice_start}:{slice_end}, :] 从mask_data (a类型)")
+            print(f"  Copy key {key_str} (layer {parsed['layer']} {parsed['param_type']}) [{slice_start}:{slice_end}, :] from mask_data (a type)")
 
 def count_mask_percentage(mask_structure, mask_name):
     """
-    统计mask结构中True和False的百分比
+    Count the percentage of True and False in mask structure
     Args:
-        mask_structure: mask数据结构
-        mask_name: mask名称
+        mask_structure: Mask data structure
+        mask_name: Mask name
     """
     true_count = 0
     false_count = 0
@@ -316,125 +316,125 @@ def count_mask_percentage(mask_structure, mask_name):
     true_percentage = (true_count / total_count * 100) if total_count > 0 else 0.0
     false_percentage = (false_count / total_count * 100) if total_count > 0 else 0.0
     
-    print(f"\n{mask_name}统计:")
-    print(f"  总元素数量: {total_count}")
-    print(f"  True数量: {true_count} ({true_percentage:.2f}%)")
-    print(f"  False数量: {false_count} ({false_percentage:.2f}%)")
+    print(f"\n{mask_name} statistics:")
+    print(f"  Total element count: {total_count}")
+    print(f"  True count: {true_count} ({true_percentage:.2f}%)")
+    print(f"  False count: {false_count} ({false_percentage:.2f}%)")
     
     return true_count, false_count, total_count, true_percentage, false_percentage
 
 def save_mask_structure(mask_structure, file_path, mask_name):
     """
-    保存mask结构到文件
+    Save mask structure to file
     Args:
-        mask_structure: mask数据结构
-        file_path: 保存路径
-        mask_name: mask名称
+        mask_structure: Mask data structure
+        file_path: Save path
+        mask_name: Mask name
     """
     try:
-        # 确保输出目录存在
+        # Ensure output directory exists
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
-        # 保存mask结构
+        # Save mask structure
         torch.save(mask_structure, file_path)
-        print(f"  成功保存{mask_name}到: {file_path}")
+        print(f"  Successfully saved {mask_name} to: {file_path}")
         
     except Exception as e:
-        print(f"  保存{mask_name}时发生错误: {e}")
+        print(f"  Error occurred while saving {mask_name}: {e}")
 
 def main():
     """
-    主函数
+    Main function
     """
     print("=== Mask Generation Tool ===")
     
-    # 解析命令行参数
+    # Parse command line arguments
     args = parse_args()
     
-    print(f"\n参数设置:")
+    print(f"\nParameter settings:")
     print(f"  mask_path: {args.mask_path}")
     print(f"  conflict_node: {args.conflict_node}")
     print(f"  false_node: {args.false_node}")
     print(f"  output: {args.output}")
     
-    # 检查文件是否存在
+    # Check if file exists
     if not os.path.exists(args.mask_path):
-        print(f"错误：mask文件不存在: {args.mask_path}")
+        print(f"Error: mask file does not exist: {args.mask_path}")
         return
     
-    # 加载mask文件
+    # Load mask file
     mask_data = load_mask_file(args.mask_path)
     if mask_data is None:
-        print("无法加载mask文件，程序退出")
+        print("Cannot load mask file, program exiting")
         return
     
-    # 加载节点列表
+    # Load node lists
     conflict_nodes, false_nodes = load_node_lists(args.conflict_node, args.false_node)
     
-    print(f"\n=== 加载完成 ===")
-    print(f"mask数据: {type(mask_data)}")
-    print(f"conflict nodes: {len(conflict_nodes)} 个")
-    print(f"false nodes: {len(false_nodes)} 个")
+    print(f"\n=== Loading completed ===")
+    print(f"mask: {type(mask_data)}")
+    print(f"conflict nodes: {len(conflict_nodes)} nodes")
+    print(f"false nodes: {len(false_nodes)} nodes")
     
-    # 统计mask_data中True和False的百分比
-    print(f"\n=== 统计mask_data中True和False的百分比 ===")
+    # Count the percentage of True and False in mask_data
+    print(f"\n=== Count percentage of True and False in mask_data ===")
     
-    # 统计mask_data
+    # Count mask_data
     true_count, false_count, total_count, true_percentage, false_percentage = count_true_false_percentage(mask_data)
     
-    print(f"总元素数量: {total_count}")
-    print(f"True数量: {true_count} ({true_percentage:.2f}%)")
-    print(f"False数量: {false_count} ({false_percentage:.2f}%)")
+    print(f"Total element count: {total_count}")
+    print(f"True count: {true_count} ({true_percentage:.2f}%)")
+    print(f"False count: {false_count} ({false_percentage:.2f}%)")
     
-    # 验证百分比总和
+    # Verify percentage sum
     total_percentage = true_percentage + false_percentage
-    print(f"百分比总和: {total_percentage:.2f}%")
+    print(f"Percentage sum: {total_percentage:.2f}%")
     
     if abs(total_percentage - 100.0) > 0.01:
-        print(f"警告：百分比总和不为100%，可能包含非布尔值")
+        print(f"Warning: Percentage sum is not 100%, may contain non-boolean values")
     
-    # 创建safe_mask和conflict_mask
-    print(f"\n=== 创建safe_mask和conflict_mask ===")
+    # Create safe_mask and conflict_mask
+    print(f"\n=== Create safe_mask and conflict_mask ===")
     
-    # 创建mask结构
+    # Create mask structure
     safe_mask,safe_mask_ture = create_mask_structure(mask_data)
     conflict_mask,conflict_mask_ture = create_mask_structure(mask_data)
     
-    print(f"创建了与mask_data相同结构的mask")
+    print(f"Created mask with the same structure as mask_data")
     
-    # 应用false_node和conflict_node到safe_mask
-    print(f"\n=== 应用false_node和conflict_node到safe_mask ===")
+    # Apply false_node and conflict_node to safe_mask
+    print(f"\n=== Apply false_node and conflict_node to safe_mask ===")
     for node in false_nodes:
         apply_node_to_mask(safe_mask, node, safe_mask_ture)
     
     for node in conflict_nodes:
         apply_node_to_mask(safe_mask, node, safe_mask_ture)
     
-    # 应用conflict_node到conflict_mask
-    print(f"\n=== 应用conflict_node到conflict_mask ===")
+    # Apply conflict_node to conflict_mask
+    print(f"\n=== Apply conflict_node to conflict_mask ===")
     for node in conflict_nodes:
         apply_node_to_mask(conflict_mask, node, conflict_mask_ture)
     
-    # 统计safe_mask和conflict_mask的True/False占比
-    print(f"\n=== 统计safe_mask和conflict_mask的True/False占比 ===")
+    # Count True/False ratio of safe_mask and conflict_mask
+    print(f"\n=== Count True/False ratio of safe_mask and conflict_mask ===")
     
-    # 统计两个mask
+    # Count two masks
     safe_stats = count_mask_percentage(safe_mask, "safe_mask")
     conflict_stats = count_mask_percentage(conflict_mask, "conflict_mask")
     
-    # 保存safe_mask和conflict_mask到output地址
-    print(f"\n=== 保存mask文件 ===")
+    # Save safe_mask and conflict_mask to output address
+    print(f"\n=== Save mask files ===")
     
-    # 生成保存路径
+    # Generate save paths
     safe_mask_path = os.path.join(args.output, "safe_mask.pt")
     conflict_mask_path = os.path.join(args.output, "conflict_mask.pt")
     
-    # 保存两个mask
+    # Save two masks
     save_mask_structure(safe_mask, safe_mask_path, "safe_mask")
     save_mask_structure(conflict_mask, conflict_mask_path, "conflict_mask")
     
-    print(f"\n所有mask文件已保存到: {args.output}")
-    print(f"准备就绪，等待后续处理逻辑...")
+    print(f"\nAll mask files have been saved to: {args.output}")
+    print(f"Ready, waiting for subsequent processing logic...")
 
 if __name__ == "__main__":
     main()
