@@ -57,7 +57,7 @@ python src/exec/unlearn_model_conlict.py
 @inproceedings{
 Chen2026clue,
 title={{CLUE}: Conflict-guided Localization for {LLM} Unlearning Framework},
-author={Hang Chen, Jiaying Zhu, Xinyu Yang, Wenya Wang },
+author={Chen, Hang and Zhu, Jiaying and Yang, Xinyu and Wang, Wenya},
 booktitle={The Fourteenth International Conference on Learning Representations},
 year={2026},
 url={https://openreview.net/forum?id=jtRYvazBWv}
