@@ -1,6 +1,6 @@
 # Execution Steps
 
-This section provides step-by-step instructions for executing the CSAT project using Edge Pruning methodology.
+This section provides step-by-step instructions for executing the CLUE project using Edge Pruning methodology. The paper is **“CLUE: Conflict-guided Localization for LLM Unlearning Framework”** accepted by ICLR 2026. 
 
 ## Step 1: Dataset Creation
 Execute the dataset creation script using Python:
@@ -52,4 +52,14 @@ Perform the unlearning process:
 ```bash
 python src/exec/unlearn_model_conlict.py
 ```
-
+## BIB
+```
+@inproceedings{
+anonymous2026clue,
+title={{CLUE}: Conflict-guided Localization for {LLM} Unlearning Framework},
+author={Anonymous},
+booktitle={The Fourteenth International Conference on Learning Representations},
+year={2026},
+url={https://openreview.net/forum?id=jtRYvazBWv}
+}
+```
